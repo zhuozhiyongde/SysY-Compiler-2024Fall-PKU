@@ -1,0 +1,10 @@
+{
+    "files.associations": {
+        "*.css": "css",
+        "*.md": "markdown",
+        "*.asm": "asm-intel-x86-generic",
+        "*.s": "lldb.disassembly",
+        "memory": "cpp",
+        "iostream": "cpp"
+    }
+}
