@@ -3,6 +3,9 @@
 #include <memory>
 #include <string>
 #include <iostream>
+
+extern std::string mode;
+
 // 所有 AST 的基类
 class BaseAST {
 public:
