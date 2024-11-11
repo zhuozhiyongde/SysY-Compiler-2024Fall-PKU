@@ -1,0 +1,8 @@
+services:
+  compiler:
+    image: maxxing/compiler-dev
+    container_name: compiler
+    volumes:
+      - ./:/root/compiler
+    command: bash -c "sleep infinity"
+    network_mode: host
