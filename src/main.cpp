@@ -15,7 +15,7 @@ using namespace std;
 extern FILE* yyin;
 extern int yyparse(unique_ptr<BaseAST>& ast);
 
-std::string mode;
+string mode = "-debug";
 
 int main(int argc, const char* argv[]) {
   // 解析命令行参数. 测试脚本/评测平台要求你的编译器能接收如下参数:
@@ -33,9 +33,9 @@ int main(int argc, const char* argv[]) {
   unique_ptr<BaseAST> ast;
   auto ret = yyparse(ast);
   assert(!ret);
-
   // 输出解析得到的 AST, 其实就是个字符串
   freopen(output, "w", stdout);
   ast->print();
+  fclose(stdout);
   return 0;
 }

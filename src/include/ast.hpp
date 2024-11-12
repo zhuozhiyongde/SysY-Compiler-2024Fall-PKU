@@ -4,7 +4,9 @@
 #include <string>
 #include <iostream>
 
-extern std::string mode;
+using namespace std;
+
+extern string mode;
 
 // 所有 AST 的基类
 class BaseAST {
@@ -17,28 +19,28 @@ public:
 class CompUnitAST : public BaseAST {
 public:
     // 用智能指针管理对象
-    std::unique_ptr<BaseAST> func_def;
+    unique_ptr<BaseAST> func_def;
     void print() const override;
 };
 
 // FuncDef 也是 BaseAST
 class FuncDefAST : public BaseAST {
 public:
-    std::unique_ptr<BaseAST> func_type;
-    std::string ident;
-    std::unique_ptr<BaseAST> block;
+    unique_ptr<BaseAST> func_type;
+    string ident;
+    unique_ptr<BaseAST> block;
     void print() const override;
 };
 
 class FuncTypeAST : public BaseAST {
 public:
-    std::string type;
+    string type;
     void print() const override;
 };
 
 class BlockAST : public BaseAST {
 public:
-    std::unique_ptr<BaseAST> stmt;
+    unique_ptr<BaseAST> stmt;
     void print() const override;
 };
 
