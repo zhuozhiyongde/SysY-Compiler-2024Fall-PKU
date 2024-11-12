@@ -5,6 +5,9 @@
         "*.asm": "asm-intel-x86-generic",
         "*.s": "lldb.disassembly",
         "memory": "cpp",
-        "iostream": "cpp"
+        "iostream": "cpp",
+        "cassert": "cpp",
+        "iosfwd": "cpp",
+        "initializer_list": "cpp"
     }
 }

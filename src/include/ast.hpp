@@ -3,10 +3,14 @@
 #include <memory>
 #include <string>
 #include <iostream>
+#include <fstream>
 
 using namespace std;
 
 extern string mode;
+extern ofstream debug_ofs;
+extern ofstream koopa_ofs;
+extern ofstream riscv_ofs;
 
 // 所有 AST 的基类
 class BaseAST {

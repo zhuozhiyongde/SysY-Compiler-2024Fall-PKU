@@ -3,7 +3,10 @@
 #include <iostream>
 #include <memory>
 #include <string>
+#include <fstream>
+#include <sstream>
 #include "include/ast.hpp"
+#include "include/asm.hpp"
 
 using namespace std;
 
@@ -16,6 +19,10 @@ extern FILE* yyin;
 extern int yyparse(unique_ptr<BaseAST>& ast);
 
 string mode = "-debug";
+
+ofstream debug_ofs;
+ofstream koopa_ofs;
+ofstream riscv_ofs;
 
 int main(int argc, const char* argv[]) {
   // 解析命令行参数. 测试脚本/评测平台要求你的编译器能接收如下参数:
@@ -34,8 +41,27 @@ int main(int argc, const char* argv[]) {
   auto ret = yyparse(ast);
   assert(!ret);
   // 输出解析得到的 AST, 其实就是个字符串
-  freopen(output, "w", stdout);
-  ast->print();
-  fclose(stdout);
+
+  if (mode == "-debug") {
+    freopen(output, "w", stdout);
+    ast->print();
+    fclose(stdout);
+  }
+  else if (mode == "-koopa") {
+    koopa_ofs.open(output);
+    ast->print();
+    koopa_ofs.close();
+  }
+  else if (mode == "-riscv") {
+    koopa_ofs.open("ir.koopa");
+    ast->print();
+    koopa_ofs.close();
+    char koopa_ir[1 << 20];
+    ifstream koopa_ifs("ir.koopa");
+    koopa_ifs.read(koopa_ir, sizeof(koopa_ir));
+    riscv_ofs.open(output);
+    parse_riscv(koopa_ir);
+    riscv_ofs.close();
+  }
   return 0;
 }

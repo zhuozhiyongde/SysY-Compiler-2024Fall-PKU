@@ -2,64 +2,64 @@
 
 void CompUnitAST::print() const {
   if (mode == "-debug") {
-    cout << "CompUnitAST { ";
+    debug_ofs << "CompUnitAST { ";
     func_def->print();
-    cout << " }";
+    debug_ofs << " }";
   }
-  else if (mode == "-koopa") {
+  else if (mode == "-koopa" || mode == "-riscv") {
     func_def->print();
   }
 }
 
 void FuncDefAST::print() const {
   if (mode == "-debug") {
-    cout << "FuncDefAST { ";
+    debug_ofs << "FuncDefAST { ";
     func_type->print();
-    cout << ", " << ident << ", ";
+    debug_ofs << ", " << ident << ", ";
     block->print();
-    cout << " }";
+    debug_ofs << " }";
   }
-  else if (mode == "-koopa") {
-    cout << "fun @" << ident << "(): ";
+  else if (mode == "-koopa" || mode == "-riscv") {
+    koopa_ofs << "fun @" << ident << "(): ";
     func_type->print();
-    cout << " {" << endl;
+    koopa_ofs << " {" << endl;
     block->print();
-    cout << "}" << endl;
+    koopa_ofs << "}" << endl;
   }
 }
 
 void FuncTypeAST::print() const {
   if (mode == "-debug") {
-    cout << "FuncTypeAST { " << type << " }";
+    debug_ofs << "FuncTypeAST { " << type << " }";
   }
-  else if (mode == "-koopa") {
+  else if (mode == "-koopa" || mode == "-riscv") {
     if (type == "int") {
-      cout << "i32";
+      koopa_ofs << "i32";
     }
     else if (type == "void") {
-      cout << "void";
+      koopa_ofs << "void";
     }
   }
 }
 
 void BlockAST::print() const {
   if (mode == "-debug") {
-    cout << "BlockAST { ";
+    debug_ofs << "BlockAST { ";
     stmt->print();
-    cout << " }";
+    debug_ofs << " }";
   }
-  else if (mode == "-koopa") {
-    cout << "%entry:" << endl;
+  else if (mode == "-koopa" || mode == "-riscv") {
+    koopa_ofs << "%entry:" << endl;
     stmt->print();
   }
 }
 
 void StmtAST::print() const {
   if (mode == "-debug") {
-    cout << "StmtAST { " << number << " }";
+    debug_ofs << "StmtAST { " << number << " }";
   }
-  else if (mode == "-koopa") {
-    cout << "  ret " << number << endl;
+  else if (mode == "-koopa" || mode == "-riscv") {
+    koopa_ofs << "  ret " << number << endl;
   }
 }
 
