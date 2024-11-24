@@ -8,6 +8,7 @@
         "iostream": "cpp",
         "cassert": "cpp",
         "iosfwd": "cpp",
-        "initializer_list": "cpp"
+        "initializer_list": "cpp",
+        "ostream": "cpp"
     }
 }

@@ -42,7 +42,7 @@ using namespace std;
 %token <int_val> INT_CONST
 
 // 非终结符的类型定义
-%type <ast_val> FuncDef FuncType Block Stmt
+%type <ast_val> FuncDef FuncType Block Stmt Exp UnaryExp PrimaryExp
 %type <int_val> Number
 
 %%
@@ -51,11 +51,15 @@ using namespace std;
 // 之前我们定义了 FuncDef 会返回一个 str_val, 也就是字符串指针
 // 而 parser 一旦解析完 CompUnit, 就说明所有的 token 都被解析了, 即解析结束了
 // 此时我们应该把 FuncDef 返回的结果收集起来, 作为 AST 传给调用 parser 的函数
-// $1 指代规则里第一个符号的返回值, 也就是 FuncDef 的返回值
+
 CompUnit
   : FuncDef {
+    // 创建一个 CompUnitAST 对象
     auto comp_unit = make_unique<CompUnitAST>();
+    // $1 指代规则里第一个符号的返回值, 也就是 FuncDef 的返回值
     comp_unit->func_def = unique_ptr<BaseAST>($1);
+    // move 是 C++11 引入的移动语义, 用于将 unique_ptr 的所有权从一个变量移动到另一个变量
+    // 这里我们把 comp_unit 的所有权移动给 ast, 这样 ast 就指向了 comp_unit 所指向的内存
     ast = move(comp_unit);
   }
   ;
@@ -66,15 +70,15 @@ FuncDef
     ast->func_type = unique_ptr<BaseAST>($1);
     ast->ident = *unique_ptr<string>($2);
     ast->block = unique_ptr<BaseAST>($5);
+    // $$ 是 Bison 提供的宏, 它代表当前规则的返回值
     $$ = ast;
   }
   ;
 
-// 同上, 不再解释
 FuncType
   : INT {
     auto ast = new FuncTypeAST();
-    ast->type = "int";
+    ast->type = "i32";
     $$ = ast;
   }
   ;
@@ -88,9 +92,56 @@ Block
   ;
 
 Stmt
-  : RETURN Number ';' {
+  : RETURN Exp ';' {
     auto ast = new StmtAST();
-    ast->number = $2;
+    ast->exp = unique_ptr<BaseAST>($2);
+    $$ = ast;
+  }
+  ;
+
+Exp
+  : UnaryExp {
+    auto ast = new ExpAST();
+    ast->unary_exp = unique_ptr<BaseAST>($1);
+    $$ = ast;
+  }
+  ;
+
+UnaryExp
+  : PrimaryExp {
+    auto ast = new UnaryExpAST();
+    ast->primary_exp = unique_ptr<BaseAST>($1);
+    $$ = ast;
+  }
+  | '+' UnaryExp {
+    auto ast = new UnaryExpWithOpAST();
+    ast->unary_op = UnaryExpWithOpAST::UnaryOp::POSITIVE;
+    ast->unary_exp = unique_ptr<BaseAST>($2);
+    $$ = ast;
+  }
+  | '-' UnaryExp {
+    auto ast = new UnaryExpWithOpAST();
+    ast->unary_op = UnaryExpWithOpAST::UnaryOp::NEGATIVE;
+    ast->unary_exp = unique_ptr<BaseAST>($2);
+    $$ = ast;
+  }
+  | '!' UnaryExp {
+    auto ast = new UnaryExpWithOpAST();
+    ast->unary_op = UnaryExpWithOpAST::UnaryOp::NOT;
+    ast->unary_exp = unique_ptr<BaseAST>($2);
+    $$ = ast;
+  }
+  ;
+
+PrimaryExp
+  : '(' Exp ')' {
+    auto ast = new PrimaryExpAST();
+    ast->exp = unique_ptr<BaseAST>($2);
+    $$ = ast;
+  }
+  | Number {
+    auto ast = new PrimaryExpAST();
+    ast->number = $1;
     $$ = ast;
   }
   ;

@@ -19,6 +19,12 @@ services:
 
 这个文件可以将当前目录直接映射到 Docker 容器中，这样内外的修改都可以实时反映到另一边。
 
+想要进入容器，可以输入：
+
+```bash
+docker exec -it compiler bash -c "cd compiler; bash"
+```
+
 ## Tmux
 
 接着，我使用 tmux 来管理内外终端环境：
