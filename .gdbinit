@@ -1,1 +1,1 @@
-set args -koopa hello.cpp -o hello.koopa
+set args -koopa hello.c -o hello.koopa

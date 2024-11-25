@@ -1,5 +1,7 @@
-	.text
-	.globl main
-main:
-	li a0, 0
-	ret
+fun @main(): i32 {
+%entry:
+	%1 = ne 11, 0
+	%2 = ne 0, 0
+	%0 = and %1, %2
+	ret %0
+}

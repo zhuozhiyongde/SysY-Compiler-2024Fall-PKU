@@ -198,3 +198,56 @@ void visit(const koopa_raw_return_t& ret) {
 ### RISC-V
 
 同上。
+
+## Lv3.3
+
+### Koopa IR
+
+草，早知道直接把 Lv3.2 和 Lv3.3 写一起了，这改来改去的，烦死了。
+
+添加多字符的标识符有两种方式：
+
+第一种，修改 `sysy.l` 文件：
+
+```flex
+"int"           { return INT; }
+"return"        { return RETURN; }
+"<="            { return LE; }
+">="            { return GE; }
+"=="            { return EQ; }
+"!="            { return NEQ; }
+"&&"            { return LOGICAL_AND; }
+"||"            { return LOGICAL_OR; }
+```
+
+第二种，在 `sysy.y` 文件中，使用多个 `''` 来读入：
+
+```bison
+RelExp '<' '=' AddExp
+```
+
+我选择的是第一种。
+
+翻译逻辑与、逻辑或为二元表达式：
+
+```cpp
+Result LExpWithOpAST::print() const {
+  Result left_result = left->print();
+  Result right_result = right->print();
+  Result result = Result(Result::Type::REG, TEMP_COUNT++);
+  if (logical_op == LogicalOp::LOGICAL_OR) {
+    Result temp = Result(Result::Type::REG, TEMP_COUNT++);
+    koopa_ofs << "\t" << temp << " = or " << left_result << ", " << right_result << endl;
+    koopa_ofs << "\t" << result << " = ne " << temp << ", 0" << endl;
+  }
+  else if (logical_op == LogicalOp::LOGICAL_AND) {
+    Result temp_1 = Result(Result::Type::REG, TEMP_COUNT++);
+    Result temp_2 = Result(Result::Type::REG, TEMP_COUNT++);
+    koopa_ofs << "\t" << temp_1 << " = ne " << left_result << ", 0" << endl;
+    koopa_ofs << "\t" << temp_2 << " = ne " << right_result << ", 0" << endl;
+    koopa_ofs << "\t" << result << " = and " << temp_1 << ", " << temp_2 << endl;
+  }
+
+  return result;
+}
+```

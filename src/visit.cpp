@@ -149,6 +149,10 @@ void visit(const koopa_raw_binary_t& binary, const koopa_raw_value_t& value) {
         riscv_ofs << "\txor " << symbol_map[value] << ", " << symbol_map[binary.lhs] << ", " << symbol_map[binary.rhs] << endl;
         riscv_ofs << "\tseqz " << symbol_map[value] << ", " << symbol_map[value] << endl;
         break;
+    case KOOPA_RBO_NOT_EQ:
+        riscv_ofs << "\txor " << symbol_map[value] << ", " << symbol_map[binary.lhs] << ", " << symbol_map[binary.rhs] << endl;
+        riscv_ofs << "\tseqz " << symbol_map[value] << ", " << symbol_map[value] << endl;
+        break;
     case KOOPA_RBO_SUB:
         riscv_ofs << "\tsub " << symbol_map[value] << ", " << symbol_map[binary.lhs] << ", " << symbol_map[binary.rhs] << endl;
         break;

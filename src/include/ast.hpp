@@ -13,7 +13,7 @@ extern ofstream debug_ofs;
 extern ofstream koopa_ofs;
 extern ofstream riscv_ofs;
 
-// 在使用前需要先声明
+// 在使用前需要先声明（这里是有一次想要强类型尝试 unique_ptr 导致的，实际上暂时不需要）
 class CompUnitAST;
 class FuncDefAST;
 class FuncTypeAST;
@@ -89,7 +89,74 @@ public:
 
 class ExpAST : public BaseAST {
 public:
-    unique_ptr<BaseAST> add_exp;
+    unique_ptr<BaseAST> l_or_exp;
+    Result print() const override;
+};
+
+class LOrExpAST : public BaseAST {
+public:
+    optional<unique_ptr<BaseAST>> l_and_exp;
+    optional<unique_ptr<BaseAST>> l_exp_with_op;
+    Result print() const override;
+};
+
+
+class LAndExpAST : public BaseAST {
+public:
+    optional<unique_ptr<BaseAST>> eq_exp;
+    optional<unique_ptr<BaseAST>> l_exp_with_op;
+    Result print() const override;
+};
+
+class LExpWithOpAST : public BaseAST {
+public:
+    enum class LogicalOp {
+        LOGICAL_OR,
+        LOGICAL_AND
+    };
+    LogicalOp logical_op;
+    unique_ptr<BaseAST> left;
+    unique_ptr<BaseAST> right;
+    Result print() const override;
+};
+
+class EqExpAST : public BaseAST {
+public:
+    optional<unique_ptr<BaseAST>> rel_exp;
+    optional<unique_ptr<BaseAST>> eq_exp_with_op;
+    Result print() const override;
+};
+
+class EqExpWithOpAST : public BaseAST {
+public:
+    enum class EqOp {
+        EQ,
+        NEQ
+    };
+    EqOp eq_op;
+    unique_ptr<BaseAST> left;
+    unique_ptr<BaseAST> right;
+    Result print() const override;
+};
+
+class RelExpAST : public BaseAST {
+public:
+    optional<unique_ptr<BaseAST>> add_exp;
+    optional<unique_ptr<BaseAST>> rel_exp_with_op;
+    Result print() const override;
+};
+
+class RelExpWithOpAST : public BaseAST {
+public:
+    enum class RelOp {
+        LE,
+        GE,
+        LT,
+        GT
+    };
+    RelOp rel_op;
+    unique_ptr<BaseAST> left;
+    unique_ptr<BaseAST> right;
     Result print() const override;
 };
 

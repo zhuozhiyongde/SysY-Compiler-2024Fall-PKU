@@ -37,12 +37,12 @@ using namespace std;
 
 // lexer 返回的所有 token 种类的声明
 // 注意 IDENT 和 INT_CONST 会返回 token 的值, 分别对应 str_val 和 int_val
-%token INT RETURN
+%token INT RETURN LE GE EQ NEQ LOGICAL_OR LOGICAL_AND
 %token <str_val> IDENT
 %token <int_val> INT_CONST
 
 // 非终结符的类型定义
-%type <ast_val> FuncDef FuncType Block Stmt Exp UnaryExp PrimaryExp MulExp AddExp
+%type <ast_val> FuncDef FuncType Block Stmt Exp UnaryExp PrimaryExp MulExp AddExp LOrExp LAndExp RelExp EqExp
 %type <int_val> Number
 
 %%
@@ -100,9 +100,89 @@ Stmt
   ;
 
 Exp
-  : AddExp {
+  : LOrExp {
     auto ast = new ExpAST();
-    ast->add_exp = unique_ptr<BaseAST>($1);
+    ast->l_or_exp = unique_ptr<BaseAST>($1);
+    $$ = ast;
+  }
+  ;
+
+LOrExp
+  : LAndExp {
+    $$ = $1;
+  }
+  | LOrExp LOGICAL_OR LAndExp {
+    auto ast = new LExpWithOpAST();
+    ast->logical_op = LExpWithOpAST::LogicalOp::LOGICAL_OR;
+    ast->left = unique_ptr<BaseAST>($1);
+    ast->right = unique_ptr<BaseAST>($3);
+    $$ = ast;
+  }
+  ;
+
+LAndExp
+  : EqExp {
+    $$ = $1;
+  }
+  | LAndExp LOGICAL_AND EqExp {
+    auto ast = new LExpWithOpAST();
+    ast->logical_op = LExpWithOpAST::LogicalOp::LOGICAL_AND;
+    ast->left = unique_ptr<BaseAST>($1);
+    ast->right = unique_ptr<BaseAST>($3);
+    $$ = ast;
+  }
+  ;
+
+EqExp
+  : RelExp {
+    $$ = $1;
+  }
+  | EqExp EQ RelExp {
+    auto ast = new EqExpWithOpAST();
+    ast->eq_op = EqExpWithOpAST::EqOp::EQ;
+    ast->left = unique_ptr<BaseAST>($1);
+    ast->right = unique_ptr<BaseAST>($3);
+    $$ = ast;
+  }
+  | EqExp NEQ RelExp {
+    auto ast = new EqExpWithOpAST();
+    ast->eq_op = EqExpWithOpAST::EqOp::NEQ;
+    ast->left = unique_ptr<BaseAST>($1);
+    ast->right = unique_ptr<BaseAST>($3);
+    $$ = ast;
+  }
+  ;
+
+RelExp
+  : AddExp {
+    $$ = $1;
+  }
+  | RelExp LE AddExp {
+    auto ast = new RelExpWithOpAST();
+    ast->rel_op = RelExpWithOpAST::RelOp::LE;
+    ast->left = unique_ptr<BaseAST>($1);
+    ast->right = unique_ptr<BaseAST>($3);
+    $$ = ast;
+  }
+  | RelExp GE AddExp {
+    auto ast = new RelExpWithOpAST();
+    ast->rel_op = RelExpWithOpAST::RelOp::GE;
+    ast->left = unique_ptr<BaseAST>($1);
+    ast->right = unique_ptr<BaseAST>($3);
+    $$ = ast;
+  }
+  | RelExp '<' AddExp {
+    auto ast = new RelExpWithOpAST();
+    ast->rel_op = RelExpWithOpAST::RelOp::LT;
+    ast->left = unique_ptr<BaseAST>($1);
+    ast->right = unique_ptr<BaseAST>($3);
+    $$ = ast;
+  }
+  | RelExp '>' AddExp {
+    auto ast = new RelExpWithOpAST();
+    ast->rel_op = RelExpWithOpAST::RelOp::GT;
+    ast->left = unique_ptr<BaseAST>($1);
+    ast->right = unique_ptr<BaseAST>($3);
     $$ = ast;
   }
   ;
