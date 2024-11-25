@@ -1,7 +1,5 @@
 fun @main(): i32 {
 %entry:
-	%0 = add 3, 4
-	%1 = mul 2, %0
-	%2 = add 1, %1
-	ret %2
+	%0 = ge 10, 7
+	ret %0
 }

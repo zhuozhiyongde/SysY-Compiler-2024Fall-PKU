@@ -251,3 +251,99 @@ Result LExpWithOpAST::print() const {
   return result;
 }
 ```
+
+### RISC-V
+
+新增 Koopa 指令：
+
+```cpp
+KOOPA_RBO_NOT_EQ
+KOOPA_RBO_LE
+KOOPA_RBO_GE
+KOOPA_RBO_LT
+KOOPA_RBO_GT
+KOOPA_RBO_OR
+KOOPA_RBO_AND
+```
+
+和先前一样，我们在 `visit.cpp` 中的下述函数签名处，添加对新指令的处理：
+
+```cpp
+void visit(const koopa_raw_binary_t& binary, const koopa_raw_value_t& value);
+```
+
+我们可以和文档一样，在 [Godbolt](https://godbolt.org/) 上查看正确的代码是怎么编译的。
+
+- 左边选择 `C`
+- 右边选择 `RISC-V rv32gc clang(trunk)`
+
+草，发现 case27 寄存器超过使用限制了，看来得复用寄存器才行，不能每个中间结果都开一个新的。
+
+正好重新设计一下 RISC-V 指令的实现，新建一个 `include/riscv.hpp`，在其中实现一个`Riscv` 类，来专门处理 RISC-V 指令。
+
+本节中有两个小的细节。
+
+首先是如何确定 reg 来存储中间结果：
+
+```cpp
+bool is_use_reg(const koopa_raw_value_t& value) {
+    if (value->kind.tag == KOOPA_RVT_INTEGER) {
+        if (value->kind.data.integer.value == 0) {
+            symbol_map[value] = "x0";
+            // 只有 0 的话，不需要占用新的寄存器
+            return false;
+        }
+        else {
+            // 说明是个立即数，需要加载到寄存器中
+            auto reg = get_reg();
+            riscv._li(reg, value->kind.data.integer.value);
+            symbol_map[value] = reg;
+            reg_count++;
+            // 由于存在一个中间结果，会占用一个寄存器
+            return true;
+        }
+    }
+    // 对于中间结果，会占用一个寄存器
+    return true;
+}
+
+void visit(const koopa_raw_binary_t& binary, const koopa_raw_value_t& value) {
+    // 访问 binary 指令
+    bool lhs_use_reg = is_use_reg(binary.lhs);
+    bool rhs_use_reg = is_use_reg(binary.rhs);
+
+    // 确定中间结果的寄存器
+    // 如果两个都是整数，显然要新开一个寄存器，来存储中间结果
+    if (!lhs_use_reg && !rhs_use_reg) {
+        symbol_map[value] = get_reg();
+        reg_count++;
+    }
+    // 对于其他情况，找一个已有寄存器来存储中间结果
+    else if (lhs_use_reg) {
+        symbol_map[value] = symbol_map[binary.lhs];
+    }
+    else {
+        symbol_map[value] = symbol_map[binary.rhs];
+    }
+    // ...
+}
+```
+
+可以看到，选择策略为，若两边都是 0，则需要新开一个寄存器，否则，选择已有寄存器。
+
+第二个细节是，如何处理 RISC-V 中没有的 LE / GE 指令:
+
+```cpp
+case KOOPA_RBO_LE:
+    // lhs <= rhs 等价于 !(lhs > rhs)
+    riscv._sgt(cur, lhs, rhs);
+    riscv._seqz(cur, cur);
+    break;
+case KOOPA_RBO_GE:
+    // lhs >= rhs 等价于 !(lhs < rhs)
+    riscv._slt(cur, lhs, rhs);
+    riscv._seqz(cur, cur);
+    break;
+```
+
+答案就是使用等价替换。

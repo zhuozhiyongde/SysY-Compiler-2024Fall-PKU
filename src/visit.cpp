@@ -1,11 +1,11 @@
 #include "include/visit.hpp"
-#include "include/utils.hpp"
-#include <unordered_map>
 
 // 寄存器计数器
 int reg_count = 0;
 // 符号到寄存器的映射，对二元表达式，可以以 lhs 或 rhs 为 key，获得其结果的寄存器
 unordered_map<koopa_raw_value_t, string> symbol_map;
+
+Riscv riscv;
 
 string get_reg() {
     // x0 是一个特殊的寄存器, 它的值恒为 0, 且向它写入的任何数据都会被丢弃.
@@ -22,19 +22,21 @@ bool is_use_reg(const koopa_raw_value_t& value) {
     if (value->kind.tag == KOOPA_RVT_INTEGER) {
         if (value->kind.data.integer.value == 0) {
             symbol_map[value] = "x0";
+            // 只有 0 的话，不需要占用新的寄存器
+            return false;
         }
         else {
+            // 说明是个立即数，需要加载到寄存器中
             auto reg = get_reg();
-            // 加载指令：load immediate
-            riscv_ofs << "\tli " << reg << ", ";
-            visit(value->kind.data.integer);
-            riscv_ofs << endl;
+            riscv._li(reg, value->kind.data.integer.value);
             symbol_map[value] = reg;
             reg_count++;
+            // 由于存在一个中间结果，会占用一个寄存器
+            return true;
         }
-        return true;
     }
-    return false;
+    // 对于中间结果，会占用一个寄存器
+    return true;
 }
 
 void visit(const koopa_raw_program_t& program) {
@@ -87,22 +89,12 @@ void visit(const koopa_raw_value_t& value) {
     switch (kind.tag) {
     case KOOPA_RVT_RETURN:
         // 访问 return 指令
-        // Koopa：
-        // ret %2
-        // ret 2
         visit(kind.data.ret);
         break;
-    case KOOPA_RVT_INTEGER:
-        // 访问 integer 指令
-        // 不是形如 %1 = sub 0, %0 这种指令
-        // 结构：
-        // ├── op: koopa_raw_binary_op_t
-        // ├── lhs: koopa_raw_value_t
-        // └── rhs: koopa_raw_value_t
-        visit(kind.data.integer);
-        break;
     case KOOPA_RVT_BINARY:
-        // 访问 binary 指令
+        // 访问 binary 指令（双目运算）
+        // 由于要存储单条指令的计算结果，所以将指令本身 value 也传入
+        // 用于后续在 symbol_map 中存储结果
         visit(kind.data.binary, value);
         break;
     default:
@@ -114,59 +106,87 @@ void visit(const koopa_raw_value_t& value) {
 void visit(const koopa_raw_return_t& ret) {
     // 形如 ret 1 直接返回整数的
     if (ret.value->kind.tag == KOOPA_RVT_INTEGER) {
-        riscv_ofs << "\tli a0, ";
-        visit(ret.value->kind.data.integer);
-        riscv_ofs << endl;
-        riscv_ofs << "\tret" << endl;
+        riscv._li("a0", ret.value->kind.data.integer.value);
+        riscv._ret();
     }
     // 形如 ret exp, 返回表达式的值
     else if (ret.value->kind.tag == KOOPA_RVT_BINARY) {
-        riscv_ofs << "\tmv a0, " << symbol_map[ret.value] << endl;
-        riscv_ofs << "\tret" << endl;
+        riscv._mv("a0", symbol_map[ret.value]);
+        riscv._ret();
     }
     else {
-        riscv_ofs << "\tli a0, 0" << endl;
-        riscv_ofs << "\tret" << endl;
+        riscv._li("a0", 0);
+        riscv._ret();
     }
 };
-void visit(const koopa_raw_integer_t& integer) {
-    riscv_ofs << integer.value;
-};
-
-unordered_map<koopa_raw_binary_op_t, string> binary_op_map = {
-    {KOOPA_RBO_EQ, "xor"},
-};
-
 void visit(const koopa_raw_binary_t& binary, const koopa_raw_value_t& value) {
     // 访问 binary 指令
     bool lhs_use_reg = is_use_reg(binary.lhs);
     bool rhs_use_reg = is_use_reg(binary.rhs);
 
-    symbol_map[value] = get_reg();
-    reg_count++;
+    // 确定中间结果的寄存器
+    // 如果两个都是整数，显然要新开一个寄存器，来存储中间结果
+    if (!lhs_use_reg && !rhs_use_reg) {
+        symbol_map[value] = get_reg();
+        reg_count++;
+    }
+    // 对于其他情况，找一个已有寄存器来存储中间结果
+    else if (lhs_use_reg) {
+        symbol_map[value] = symbol_map[binary.lhs];
+    }
+    else {
+        symbol_map[value] = symbol_map[binary.rhs];
+    }
+
+    const auto cur = symbol_map[value];
+    const auto lhs = symbol_map[binary.lhs];
+    const auto rhs = symbol_map[binary.rhs];
+
     switch (binary.op) {
     case KOOPA_RBO_EQ:
-        riscv_ofs << "\txor " << symbol_map[value] << ", " << symbol_map[binary.lhs] << ", " << symbol_map[binary.rhs] << endl;
-        riscv_ofs << "\tseqz " << symbol_map[value] << ", " << symbol_map[value] << endl;
+        riscv._xor(cur, lhs, rhs);
+        riscv._seqz(cur, cur);
         break;
     case KOOPA_RBO_NOT_EQ:
-        riscv_ofs << "\txor " << symbol_map[value] << ", " << symbol_map[binary.lhs] << ", " << symbol_map[binary.rhs] << endl;
-        riscv_ofs << "\tseqz " << symbol_map[value] << ", " << symbol_map[value] << endl;
+        riscv._xor(cur, lhs, rhs);
+        riscv._snez(cur, cur);
+        break;
+    case KOOPA_RBO_LE:
+        // lhs <= rhs 等价于 !(lhs > rhs)
+        riscv._sgt(cur, lhs, rhs);
+        riscv._seqz(cur, cur);
+        break;
+    case KOOPA_RBO_GE:
+        // lhs >= rhs 等价于 !(lhs < rhs)
+        riscv._slt(cur, lhs, rhs);
+        riscv._seqz(cur, cur);
+        break;
+    case KOOPA_RBO_LT:
+        riscv._slt(cur, lhs, rhs);
+        break;
+    case KOOPA_RBO_GT:
+        riscv._sgt(cur, lhs, rhs);
+        break;
+    case KOOPA_RBO_OR:
+        riscv._or(cur, lhs, rhs);
+        break;
+    case KOOPA_RBO_AND:
+        riscv._and(cur, lhs, rhs);
         break;
     case KOOPA_RBO_SUB:
-        riscv_ofs << "\tsub " << symbol_map[value] << ", " << symbol_map[binary.lhs] << ", " << symbol_map[binary.rhs] << endl;
+        riscv._sub(cur, lhs, rhs);
         break;
     case KOOPA_RBO_ADD:
-        riscv_ofs << "\tadd " << symbol_map[value] << ", " << symbol_map[binary.lhs] << ", " << symbol_map[binary.rhs] << endl;
+        riscv._add(cur, lhs, rhs);
         break;
     case KOOPA_RBO_MUL:
-        riscv_ofs << "\tmul " << symbol_map[value] << ", " << symbol_map[binary.lhs] << ", " << symbol_map[binary.rhs] << endl;
+        riscv._mul(cur, lhs, rhs);
         break;
     case KOOPA_RBO_DIV:
-        riscv_ofs << "\tdiv " << symbol_map[value] << ", " << symbol_map[binary.lhs] << ", " << symbol_map[binary.rhs] << endl;
+        riscv._div(cur, lhs, rhs);
         break;
     case KOOPA_RBO_MOD:
-        riscv_ofs << "\trem " << symbol_map[value] << ", " << symbol_map[binary.lhs] << ", " << symbol_map[binary.rhs] << endl;
+        riscv._rem(cur, lhs, rhs);
         break;
     default:
         riscv_ofs << "Invalid binary operation: " << koopaRawBinaryOpToString(binary.op) << endl;

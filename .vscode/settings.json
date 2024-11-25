@@ -9,6 +9,7 @@
         "cassert": "cpp",
         "iosfwd": "cpp",
         "initializer_list": "cpp",
-        "ostream": "cpp"
+        "ostream": "cpp",
+        "unordered_map": "cpp"
     }
 }

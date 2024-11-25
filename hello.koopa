@@ -1,7 +1,5 @@
 fun @main(): i32 {
 %entry:
-	%1 = ne 11, 0
-	%2 = ne 0, 0
-	%0 = and %1, %2
+	%0 = eq 1, 0
 	ret %0
 }
