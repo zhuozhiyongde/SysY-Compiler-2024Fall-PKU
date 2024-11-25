@@ -155,6 +155,15 @@ void visit(const koopa_raw_binary_t& binary, const koopa_raw_value_t& value) {
     case KOOPA_RBO_ADD:
         riscv_ofs << "\tadd " << symbol_map[value] << ", " << symbol_map[binary.lhs] << ", " << symbol_map[binary.rhs] << endl;
         break;
+    case KOOPA_RBO_MUL:
+        riscv_ofs << "\tmul " << symbol_map[value] << ", " << symbol_map[binary.lhs] << ", " << symbol_map[binary.rhs] << endl;
+        break;
+    case KOOPA_RBO_DIV:
+        riscv_ofs << "\tdiv " << symbol_map[value] << ", " << symbol_map[binary.lhs] << ", " << symbol_map[binary.rhs] << endl;
+        break;
+    case KOOPA_RBO_MOD:
+        riscv_ofs << "\trem " << symbol_map[value] << ", " << symbol_map[binary.lhs] << ", " << symbol_map[binary.rhs] << endl;
+        break;
     default:
         riscv_ofs << "Invalid binary operation: " << koopaRawBinaryOpToString(binary.op) << endl;
     }

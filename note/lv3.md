@@ -197,3 +197,4 @@ void visit(const koopa_raw_return_t& ret) {
 
 ### RISC-V
 
+同上。
