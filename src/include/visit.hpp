@@ -17,3 +17,4 @@ void visit(const koopa_raw_basic_block_t& bb);
 void visit(const koopa_raw_value_t& value);
 void visit(const koopa_raw_return_t& ret);
 void visit(const koopa_raw_integer_t& integer);
+void visit(const koopa_raw_binary_t& binary, const koopa_raw_value_t& value);

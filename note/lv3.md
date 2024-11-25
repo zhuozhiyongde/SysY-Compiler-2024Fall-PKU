@@ -2,6 +2,8 @@
 
 ## Lv3.1
 
+### Koopa IR
+
 对于产生式的或 `|` 语法，需要支持。
 
 对于 `.y` 文件：
@@ -103,3 +105,86 @@ Result ExpAST::print() const {
 }
 ```
 
+### RISC-V
+
+首先，我们需要修改：
+
+```cpp
+void visit(const koopa_raw_value_t& value) {
+    // 根据指令类型判断后续需要如何访问
+    switch (kind.tag) {
+      // ...
+    }
+}
+```
+
+这里，添加一个分支，处理新获得的 `KOOPA_RVT_BINARY` 类型指令。
+
+查看它的类型定义：
+
+```cpp
+typedef struct {
+  koopa_raw_binary_op_t op;
+  koopa_raw_value_t lhs;
+  koopa_raw_value_t rhs;
+} koopa_raw_binary_t;
+```
+
+从而知道，`koopa_raw_binary_t` 类型指令的左右操作数分别是 `lhs` 和 `rhs`，操作符是 `op`。
+
+这里，为了方便 debug，我们引入 `include/utils.hpp` 以及对应的 `utils.cpp` 文件，创建辅助函数（具体实现见源文件，就是无聊的 switch case）：
+
+```cpp
+#pragma once
+#include "koopa.h"
+#include <string>
+
+std::string koopaRawValueTagToString(int tag);
+std::string koopaRawBinaryOpToString(int op);
+```
+
+那这就会带来一个问题：
+
+怎么确定一个操作数是立即数，还是一个之前指令的结果？
+
+答案是，根据 `tag` 来判断：
+
+- 如果 `tag` 是 `KOOPA_RVT_INTEGER`，那么他就是立即数。
+- 如果 `tag` 是 `KOOPA_RVT_BINARY`，那么他就是之前某条指令的结果。
+
+所以，为了让我们的 visit 函数能正确处理这里的寄存器，我们需要在处理 `visit(const koopa_raw_binary_t& binary)` 时，递归处理 `lhs` 和 `rhs`，且处理时，我们就需要设法管理寄存器，从而能在前面存、在后面取。
+
+指令类型通过 `kind.tag` 来区分，指令内容通过 `kind.data` 来访问。
+
+由于我们需要存储一条指令的返回结果（以供未来使用），所以我们还需要修改这个 visit 函数，引入第二个参数 `value`，来表示当前指令：
+
+```cpp
+void visit(const koopa_raw_binary_t& binary, const koopa_raw_value_t& value) {
+    // ...
+}
+```
+
+同时，我们还要处理 ret 语句的 visit 函数，使之支持返回表达式的值。
+
+形如 `ret %1` 的指令，其 `ret.value` 就是之前的指令的指针（就是文档的说法）。
+
+```cpp
+void visit(const koopa_raw_return_t& ret) {
+    // 形如 ret 1 直接返回整数的
+    if (ret.value->kind.tag == KOOPA_RVT_INTEGER) {
+        riscv_ofs << "\tli a0, ";
+        visit(ret.value->kind.data.integer);
+        riscv_ofs << endl;
+        riscv_ofs << "\tret" << endl;
+    }
+    // 形如 ret exp, 返回表达式的值
+    else if (ret.value->kind.tag == KOOPA_RVT_BINARY) {
+        riscv_ofs << "\tmv a0, " << symbol_map[ret.value] << endl;
+        riscv_ofs << "\tret" << endl;
+    }
+    else {
+        riscv_ofs << "\tli a0, 0" << endl;
+        riscv_ofs << "\tret" << endl;
+    }
+};
+```
