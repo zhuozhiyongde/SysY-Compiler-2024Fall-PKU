@@ -20,9 +20,14 @@ class FuncTypeAST;
 class BlockAST;
 class StmtAST;
 class ExpAST;
+class AddExpAST;
+class AddExpWithOpAST;
+class MulExpAST;
+class MulExpWithOpAST;
 class UnaryExpAST;
 class PrimaryExpAST;
 class UnaryExpWithOpAST;
+
 
 class Result {
 public:
@@ -84,7 +89,46 @@ public:
 
 class ExpAST : public BaseAST {
 public:
-    unique_ptr<BaseAST> unary_exp;
+    unique_ptr<BaseAST> add_exp;
+    Result print() const override;
+};
+
+class AddExpAST : public BaseAST {
+public:
+    optional<unique_ptr<BaseAST>> mul_exp;
+    optional<unique_ptr<BaseAST>> add_exp_with_op;
+    Result print() const override;
+};
+
+class AddExpWithOpAST : public BaseAST {
+public:
+    enum class AddOp {
+        ADD,
+        SUB
+    };
+    AddOp add_op;
+    unique_ptr<BaseAST> left;
+    unique_ptr<BaseAST> right;
+    Result print() const override;
+};
+
+class MulExpAST : public BaseAST {
+public:
+    optional<unique_ptr<BaseAST>> unary_exp;
+    optional<unique_ptr<BaseAST>> mul_exp_with_op;
+    Result print() const override;
+};
+
+class MulExpWithOpAST : public BaseAST {
+public:
+    enum class MulOp {
+        MUL,
+        DIV,
+        MOD
+    };
+    MulOp mul_op;
+    unique_ptr<BaseAST> left;
+    unique_ptr<BaseAST> right;
     Result print() const override;
 };
 

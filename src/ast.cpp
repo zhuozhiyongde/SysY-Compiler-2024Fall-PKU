@@ -34,7 +34,54 @@ Result StmtAST::print() const {
 }
 
 Result ExpAST::print() const {
-  return unary_exp->print();
+  return add_exp->print();
+}
+
+Result AddExpAST::print() const {
+  if (mul_exp) {
+    return (*mul_exp)->print();
+  }
+  else if (add_exp_with_op) {
+    return (*add_exp_with_op)->print();
+  }
+  return Result();
+}
+
+Result AddExpWithOpAST::print() const {
+  Result left_result = left->print();
+  Result right_result = right->print();
+  if (add_op == AddOp::ADD) {
+    koopa_ofs << "\t%" << TEMP_COUNT++ << " = add " << left_result << ", " << right_result << endl;
+  }
+  else if (add_op == AddOp::SUB) {
+    koopa_ofs << "\t%" << TEMP_COUNT++ << " = sub " << left_result << ", " << right_result << endl;
+  }
+  return Result(Result::Type::REG, TEMP_COUNT - 1);
+}
+
+Result MulExpAST::print() const {
+  if (unary_exp) {
+    return (*unary_exp)->print();
+  }
+  else if (mul_exp_with_op) {
+    return (*mul_exp_with_op)->print();
+  }
+  return Result();
+}
+
+Result MulExpWithOpAST::print() const {
+  Result left_result = left->print();
+  Result right_result = right->print();
+  if (mul_op == MulOp::MUL) {
+    koopa_ofs << "\t%" << TEMP_COUNT++ << " = mul " << left_result << ", " << right_result << endl;
+  }
+  else if (mul_op == MulOp::DIV) {
+    koopa_ofs << "\t%" << TEMP_COUNT++ << " = div " << left_result << ", " << right_result << endl;
+  }
+  else if (mul_op == MulOp::MOD) {
+    koopa_ofs << "\t%" << TEMP_COUNT++ << " = mod " << left_result << ", " << right_result << endl;
+  }
+  return Result(Result::Type::REG, TEMP_COUNT - 1);
 }
 
 Result UnaryExpAST::print() const {

@@ -188,3 +188,12 @@ void visit(const koopa_raw_return_t& ret) {
     }
 };
 ```
+
+## Lv3.2
+
+### Koopa IR
+
+没啥好说的，和 Lv 3.1 思路类似的修改方式。
+
+### RISC-V
+
