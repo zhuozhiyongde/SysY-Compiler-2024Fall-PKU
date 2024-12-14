@@ -87,6 +87,16 @@ Result EqExpAST::print() const {
   return Result();
 }
 
+EqExpWithOpAST::EqOp EqExpWithOpAST::convert(const string& op) const {
+  if (op == "==") {
+    return EqOp::EQ;
+  }
+  else if (op == "!=") {
+    return EqOp::NEQ;
+  }
+  throw runtime_error("Invalid operator: " + op);
+}
+
 Result EqExpWithOpAST::print() const {
   Result left_result = left->print();
   Result right_result = right->print();
@@ -108,6 +118,22 @@ Result RelExpAST::print() const {
     return (*rel_exp_with_op)->print();
   }
   return Result();
+}
+
+RelExpWithOpAST::RelOp RelExpWithOpAST::convert(const string& op) const {
+  if (op == "<=") {
+    return RelOp::LE;
+  }
+  else if (op == ">=") {
+    return RelOp::GE;
+  }
+  else if (op == "<") {
+    return RelOp::LT;
+  }
+  else if (op == ">") {
+    return RelOp::GT;
+  }
+  throw runtime_error("Invalid operator: " + op);
 }
 
 Result RelExpWithOpAST::print() const {
@@ -139,6 +165,16 @@ Result AddExpAST::print() const {
   return Result();
 }
 
+AddExpWithOpAST::AddOp AddExpWithOpAST::convert(const string& op) const {
+  if (op == "+") {
+    return AddOp::ADD;
+  }
+  else if (op == "-") {
+    return AddOp::SUB;
+  }
+  throw runtime_error("Invalid operator: " + op);
+}
+
 Result AddExpWithOpAST::print() const {
   Result left_result = left->print();
   Result right_result = right->print();
@@ -160,6 +196,19 @@ Result MulExpAST::print() const {
     return (*mul_exp_with_op)->print();
   }
   return Result();
+}
+
+MulExpWithOpAST::MulOp MulExpWithOpAST::convert(const string& op) const {
+  if (op == "*") {
+    return MulOp::MUL;
+  }
+  else if (op == "/") {
+    return MulOp::DIV;
+  }
+  else if (op == "%") {
+    return MulOp::MOD;
+  }
+  throw runtime_error("Invalid operator: " + op);
 }
 
 Result MulExpWithOpAST::print() const {
@@ -197,6 +246,19 @@ Result PrimaryExpAST::print() const {
     return result;
   }
   return Result();
+}
+
+UnaryExpWithOpAST::UnaryOp UnaryExpWithOpAST::convert(const string& op) const {
+  if (op == "+") {
+    return UnaryOp::POSITIVE;
+  }
+  else if (op == "-") {
+    return UnaryOp::NEGATIVE;
+  }
+  else if (op == "!") {
+    return UnaryOp::NOT;
+  }
+  throw runtime_error("Invalid operator: " + op);
 }
 
 Result UnaryExpWithOpAST::print() const {

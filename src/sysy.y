@@ -37,8 +37,9 @@ using namespace std;
 
 // lexer 返回的所有 token 种类的声明
 // 注意 IDENT 和 INT_CONST 会返回 token 的值, 分别对应 str_val 和 int_val
-%token INT RETURN LE GE EQ NEQ LOGICAL_OR LOGICAL_AND
+%token INT RETURN
 %token <str_val> IDENT
+%token <str_val> EqOp RelOp AddOp NotOp MulOp AndOp OrOp
 %token <int_val> INT_CONST
 
 // 非终结符的类型定义
@@ -111,7 +112,7 @@ LOrExp
   : LAndExp {
     $$ = $1;
   }
-  | LOrExp LOGICAL_OR LAndExp {
+  | LOrExp OrOp LAndExp {
     auto ast = new LExpWithOpAST();
     ast->logical_op = LExpWithOpAST::LogicalOp::LOGICAL_OR;
     ast->left = unique_ptr<BaseAST>($1);
@@ -124,7 +125,7 @@ LAndExp
   : EqExp {
     $$ = $1;
   }
-  | LAndExp LOGICAL_AND EqExp {
+  | LAndExp AndOp EqExp {
     auto ast = new LExpWithOpAST();
     ast->logical_op = LExpWithOpAST::LogicalOp::LOGICAL_AND;
     ast->left = unique_ptr<BaseAST>($1);
@@ -137,16 +138,10 @@ EqExp
   : RelExp {
     $$ = $1;
   }
-  | EqExp EQ RelExp {
+  | EqExp EqOp RelExp {
     auto ast = new EqExpWithOpAST();
-    ast->eq_op = EqExpWithOpAST::EqOp::EQ;
-    ast->left = unique_ptr<BaseAST>($1);
-    ast->right = unique_ptr<BaseAST>($3);
-    $$ = ast;
-  }
-  | EqExp NEQ RelExp {
-    auto ast = new EqExpWithOpAST();
-    ast->eq_op = EqExpWithOpAST::EqOp::NEQ;
+    auto eq_op = *unique_ptr<string>($2);
+    ast->eq_op = ast->convert(eq_op);
     ast->left = unique_ptr<BaseAST>($1);
     ast->right = unique_ptr<BaseAST>($3);
     $$ = ast;
@@ -157,30 +152,10 @@ RelExp
   : AddExp {
     $$ = $1;
   }
-  | RelExp LE AddExp {
+  | RelExp RelOp AddExp {
     auto ast = new RelExpWithOpAST();
-    ast->rel_op = RelExpWithOpAST::RelOp::LE;
-    ast->left = unique_ptr<BaseAST>($1);
-    ast->right = unique_ptr<BaseAST>($3);
-    $$ = ast;
-  }
-  | RelExp GE AddExp {
-    auto ast = new RelExpWithOpAST();
-    ast->rel_op = RelExpWithOpAST::RelOp::GE;
-    ast->left = unique_ptr<BaseAST>($1);
-    ast->right = unique_ptr<BaseAST>($3);
-    $$ = ast;
-  }
-  | RelExp '<' AddExp {
-    auto ast = new RelExpWithOpAST();
-    ast->rel_op = RelExpWithOpAST::RelOp::LT;
-    ast->left = unique_ptr<BaseAST>($1);
-    ast->right = unique_ptr<BaseAST>($3);
-    $$ = ast;
-  }
-  | RelExp '>' AddExp {
-    auto ast = new RelExpWithOpAST();
-    ast->rel_op = RelExpWithOpAST::RelOp::GT;
+    auto rel_op = *unique_ptr<string>($2);
+    ast->rel_op = ast->convert(rel_op);
     ast->left = unique_ptr<BaseAST>($1);
     ast->right = unique_ptr<BaseAST>($3);
     $$ = ast;
@@ -191,16 +166,10 @@ AddExp
   : MulExp {
     $$ = $1;
   }
-  | AddExp '+' MulExp {
+  | AddExp AddOp MulExp {
     auto ast = new AddExpWithOpAST();
-    ast->add_op = AddExpWithOpAST::AddOp::ADD;
-    ast->left = unique_ptr<BaseAST>($1);
-    ast->right = unique_ptr<BaseAST>($3);
-    $$ = ast;
-  }
-  | AddExp '-' MulExp {
-    auto ast = new AddExpWithOpAST();
-    ast->add_op = AddExpWithOpAST::AddOp::SUB;
+    auto add_op = *unique_ptr<string>($2);
+    ast->add_op = ast->convert(add_op);
     ast->left = unique_ptr<BaseAST>($1);
     ast->right = unique_ptr<BaseAST>($3);
     $$ = ast;
@@ -211,23 +180,10 @@ MulExp
   : UnaryExp {
     $$ = $1;
   }
-  | MulExp '*' UnaryExp {
+  | MulExp MulOp UnaryExp {
     auto ast = new MulExpWithOpAST();
-    ast->mul_op = MulExpWithOpAST::MulOp::MUL;
-    ast->left = unique_ptr<BaseAST>($1);
-    ast->right = unique_ptr<BaseAST>($3);
-    $$ = ast;
-  }
-  | MulExp '/' UnaryExp {
-    auto ast = new MulExpWithOpAST();
-    ast->mul_op = MulExpWithOpAST::MulOp::DIV;
-    ast->left = unique_ptr<BaseAST>($1);
-    ast->right = unique_ptr<BaseAST>($3);
-    $$ = ast;
-  }
-  | MulExp '%' UnaryExp {
-    auto ast = new MulExpWithOpAST();
-    ast->mul_op = MulExpWithOpAST::MulOp::MOD;
+    auto mul_op = *unique_ptr<string>($2);
+    ast->mul_op = ast->convert(mul_op);
     ast->left = unique_ptr<BaseAST>($1);
     ast->right = unique_ptr<BaseAST>($3);
     $$ = ast;
@@ -240,21 +196,17 @@ UnaryExp
     ast->primary_exp = unique_ptr<BaseAST>($1);
     $$ = ast;
   }
-  | '+' UnaryExp {
+  | AddOp UnaryExp {
     auto ast = new UnaryExpWithOpAST();
-    ast->unary_op = UnaryExpWithOpAST::UnaryOp::POSITIVE;
+    auto add_op = *unique_ptr<string>($1);
+    ast->unary_op = ast->convert(add_op);
     ast->unary_exp = unique_ptr<BaseAST>($2);
     $$ = ast;
   }
-  | '-' UnaryExp {
+  | NotOp UnaryExp {
     auto ast = new UnaryExpWithOpAST();
-    ast->unary_op = UnaryExpWithOpAST::UnaryOp::NEGATIVE;
-    ast->unary_exp = unique_ptr<BaseAST>($2);
-    $$ = ast;
-  }
-  | '!' UnaryExp {
-    auto ast = new UnaryExpWithOpAST();
-    ast->unary_op = UnaryExpWithOpAST::UnaryOp::NOT;
+    auto not_op = *unique_ptr<string>($1);
+    ast->unary_op = ast->convert(not_op);
     ast->unary_exp = unique_ptr<BaseAST>($2);
     $$ = ast;
   }

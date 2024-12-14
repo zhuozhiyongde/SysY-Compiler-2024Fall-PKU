@@ -347,3 +347,136 @@ case KOOPA_RBO_GE:
 ```
 
 答案就是使用等价替换。
+
+## Extra
+
+在上述实现中，不难发现对于 op 的使用过于繁琐，我们找一个办法来解耦代码。以下给出一个示例。
+
+将
+
+```bison
+"<="            { return LE; }
+">="            { return GE; }
+```
+
+改为
+
+```bison
+RelOp         ("<"|">"|"<="|">=")
+```
+
+将
+
+```flex
+
+RelExp
+  : AddExp {
+    $$ = $1;
+  }
+  | RelExp LE AddExp {
+    auto ast = new RelExpWithOpAST();
+    ast->rel_op = RelExpWithOpAST::RelOp::LE;
+    ast->left = unique_ptr<BaseAST>($1);
+    ast->right = unique_ptr<BaseAST>($3);
+    $$ = ast;
+  }
+  | RelExp GE AddExp {
+    auto ast = new RelExpWithOpAST();
+    ast->rel_op = RelExpWithOpAST::RelOp::GE;
+    ast->left = unique_ptr<BaseAST>($1);
+    ast->right = unique_ptr<BaseAST>($3);
+    $$ = ast;
+  }
+  | RelExp '<' AddExp {
+    auto ast = new RelExpWithOpAST();
+    ast->rel_op = RelExpWithOpAST::RelOp::LT;
+    ast->left = unique_ptr<BaseAST>($1);
+    ast->right = unique_ptr<BaseAST>($3);
+    $$ = ast;
+  }
+  | RelExp '>' AddExp {
+    auto ast = new RelExpWithOpAST();
+    ast->rel_op = RelExpWithOpAST::RelOp::GT;
+    ast->left = unique_ptr<BaseAST>($1);
+    ast->right = unique_ptr<BaseAST>($3);
+    $$ = ast;
+  }
+  ;
+```
+
+改为
+
+```flex
+RelExp
+  : AddExp {
+    $$ = $1;
+  }
+  | RelExp RelOp AddExp {
+    auto ast = new RelExpWithOpAST();
+    auto rel_op = *unique_ptr<string>($2);
+    ast->rel_op = ast->convert(rel_op);
+    ast->left = unique_ptr<BaseAST>($1);
+    ast->right = unique_ptr<BaseAST>($3);
+    $$ = ast;
+  }
+  ;
+```
+
+同时实现对应的 `RelExpWithOpAST::convert` 函数：
+
+```cpp
+RelExpWithOpAST::RelOp RelExpWithOpAST::convert(const string& op) const {
+  if (op == "<=") {
+    return RelOp::LE;
+  }
+  else if (op == ">=") {
+    return RelOp::GE;
+  }
+  else if (op == "<") {
+    return RelOp::LT;
+  }
+  else if (op == ">") {
+    return RelOp::GT;
+  }
+  throw runtime_error("Invalid operator: " + op);
+}
+```
+
+注意，这里有一个小细节问题，由于二元运算符 `+` / `-` 亦可作为单目运算符，所以被迫在不同地方复用：
+
+```flex
+AddExp
+  : MulExp {
+    $$ = $1;
+  }
+  | AddExp AddOp MulExp {
+    auto ast = new AddExpWithOpAST();
+    auto add_op = *unique_ptr<string>($2);
+    ast->add_op = ast->convert(add_op);
+    ast->left = unique_ptr<BaseAST>($1);
+    ast->right = unique_ptr<BaseAST>($3);
+    $$ = ast;
+  }
+  ;
+
+UnaryExp
+  : PrimaryExp {
+    auto ast = new UnaryExpAST();
+    ast->primary_exp = unique_ptr<BaseAST>($1);
+    $$ = ast;
+  }
+  | AddOp UnaryExp {
+    auto ast = new UnaryExpWithOpAST();
+    auto add_op = *unique_ptr<string>($1);
+    ast->unary_op = ast->convert(add_op);
+    ast->unary_exp = unique_ptr<BaseAST>($2);
+    $$ = ast;
+  }
+  | NotOp UnaryExp {
+    auto ast = new UnaryExpWithOpAST();
+    auto not_op = *unique_ptr<string>($1);
+    ast->unary_op = ast->convert(not_op);
+    ast->unary_exp = unique_ptr<BaseAST>($2);
+    $$ = ast;
+  }
+```

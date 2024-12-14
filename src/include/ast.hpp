@@ -136,6 +136,7 @@ public:
     EqOp eq_op;
     unique_ptr<BaseAST> left;
     unique_ptr<BaseAST> right;
+    EqOp convert(const string& op) const;
     Result print() const override;
 };
 
@@ -157,6 +158,7 @@ public:
     RelOp rel_op;
     unique_ptr<BaseAST> left;
     unique_ptr<BaseAST> right;
+    RelOp convert(const string& op) const;
     Result print() const override;
 };
 
@@ -176,6 +178,7 @@ public:
     AddOp add_op;
     unique_ptr<BaseAST> left;
     unique_ptr<BaseAST> right;
+    AddOp convert(const string& op) const;
     Result print() const override;
 };
 
@@ -196,6 +199,7 @@ public:
     MulOp mul_op;
     unique_ptr<BaseAST> left;
     unique_ptr<BaseAST> right;
+    MulOp convert(const string& op) const;
     Result print() const override;
 };
 
@@ -222,5 +226,6 @@ public:
     };
     UnaryOp unary_op;
     unique_ptr<BaseAST> unary_exp;
+    UnaryOp convert(const string& op) const;
     Result print() const override;
 };

@@ -10,6 +10,8 @@
         "iosfwd": "cpp",
         "initializer_list": "cpp",
         "ostream": "cpp",
-        "unordered_map": "cpp"
+        "unordered_map": "cpp",
+        "stdexcept": "cpp",
+        "string": "cpp"
     }
 }
