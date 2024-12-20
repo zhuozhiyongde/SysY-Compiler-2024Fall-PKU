@@ -74,3 +74,143 @@ Result BlockAST::print() const {
 ```
 
 这里末尾加了一个 `_` 是类比 PyTorch 的“原地操作” 进行命名的，表示“在这里生成一个对应类”，这同时也是为了区分同名类型常量。
+
+## Riscv
+
+首先，我们使用如下代码获取帧栈大小：
+
+```cpp
+void visit(const koopa_raw_function_t& func) {
+    // 访问所有基本块，bbs: basic block slice
+    // 忽略函数名前的@，@main -> main
+    riscv_ofs << "\t.globl " << func->name + 1 << endl;
+    riscv_ofs << func->name + 1 << ":" << endl;
+    int cnt = 0;
+    for (size_t i = 0; i < func->bbs.len; ++i) {
+        auto bb = reinterpret_cast<koopa_raw_basic_block_t>(func->bbs.buffer[i]);
+        cnt += bb->insts.len;
+        for (size_t j = 0; j < bb->insts.len; ++j) {
+            auto inst = reinterpret_cast<koopa_raw_value_t>(bb->insts.buffer[j]);
+            if (inst->ty->tag == KOOPA_RTT_UNIT) {
+                cnt -= 1;
+            }
+        }
+    }
+    int stack_size = cnt * 4;
+};
+```
+
+但是，注意到示例代码中，我们实际上是先恢复帧栈再 ret 的，所以我们必须拆开创建帧栈和恢复帧栈到两个地方。
+
+一个合理的想法是把这个帧栈大小置为全局变量，这样就能在过程间共享，但出于可维护性的考量，我们创建一个新的类 `ContextManager` 来管理帧栈，这样即使我们未来需要处理被调用者保存寄存器等问题，也能有比较好的扩展性。
+
+计划创建一个字典，根据函数名来存储栈帧大小。
+
+```cpp
+// include/helper.hpp
+class Context {
+public:
+    int stack_size;
+    unordered_map<koopa_raw_value_t, string> stack_map;
+    Context(int stack_size) : stack_size(stack_size) {}
+    void push(const koopa_raw_value_t& value, const string& bias) {
+        stack_map[value] = bias + "(sp)";
+    }
+};
+
+class ContextManager {
+public:
+    unordered_map<string, Context> context_map;
+    void create(const string& name, int stack_size) {
+        context_map[name] = Context(stack_size);
+    }
+    Context& get(const string& name) {
+        return context_map[name];
+    }
+};
+```
+
+同时，在 `visit.cpp` 中，创建如下全局变量：
+
+```cpp
+ContextManager context_manager;
+Context& context; // 当前函数对应的 context
+```
+
+我额外重构了所有涉及寄存器分配的部分：
+
+```cpp
+// include/helper.hpp
+class RegisterManager {
+private:
+    // 寄存器计数器
+    int reg_count = 0;
+public:
+    // 存储指令到寄存器的映射
+    unordered_map<koopa_raw_value_t, string> reg_map;
+    string cur_reg() {
+        // x0 是一个特殊的寄存器, 它的值恒为 0, 且向它写入的任何数据都会被丢弃.
+        // t0 到 t6 寄存器, 以及 a0 到 a7 寄存器可以用来存放临时值.
+        if (reg_count < 8) {
+            return "t" + to_string(reg_count);
+        }
+        else {
+            return "a" + to_string(reg_count - 8);
+        }
+    }
+    string new_reg() {
+        string reg = cur_reg();
+        reg_count++;
+        return reg;
+    }
+    // 返回是否需要使用寄存器，主要用于二元表达式存储结果
+    // 注意！！这个函数是处理操作数的，而不是指令的
+    bool get_operand_reg(const koopa_raw_value_t& value) {
+        if (value->kind.tag == KOOPA_RVT_INTEGER) {
+            if (value->kind.data.integer.value == 0) {
+                reg_map[value] = "x0";
+                return false;
+            }
+            else {
+                reg_map[value] = new_reg();
+                riscv._li(reg_map[value], value->kind.data.integer.value);
+                return true;
+            }
+        }
+        // 运算数为 load 指令，先加载
+        else if (value->kind.tag == KOOPA_RVT_LOAD) {
+            reg_map[value] = new_reg();
+            riscv._lw(reg_map[value], context.stack_map[value]);
+            return true;
+        }
+        // 运算数为二元运算的结果，也需要先加载
+        // 出现在形如 a = a + b + c 的式子中
+        else if (value->kind.tag == KOOPA_RVT_BINARY) {
+            reg_map[value] = new_reg();
+            riscv._lw(reg_map[value], context.stack_map[value]);
+            return true;
+        }
+        return true;
+    }
+};
+
+```
+
+这里千万要注意 `KOOPA_RVT_BINARY`，对于一条 `a = a + b + c` 的式子，实际上会被编译为两条二元运算，所以你必须将每次运算的中间结果都压入栈中。
+
+在修改 `visit.cpp` 时，必须需要辨析当前使用的 map 究竟是寄存器的 `reg_map` 还是帧栈的 `stack_map`，它们都以一条代表指令的 `koopa_raw_value_t` 类型为键。
+
+一句话概括就是你得看现在是否在访存，如果在访存，也即 `lw / sw` 指令，那必然需要使用 `stack_map`，如果仅仅是在执行计算，那只需要使用 `reg_map`。
+
+```cpp
+// 形如 ret exp, 返回表达式的值
+else if (ret.value->kind.tag == KOOPA_RVT_BINARY) {
+    riscv._lw("a0", context.stack_map[ret.value]);
+    // 或者使用 mv 指令，将寄存器中的值赋值给 a0
+    // riscv._mv("a0", register_manager.reg_map[ret.value]);
+
+}
+else if (ret.value->kind.tag == KOOPA_RVT_LOAD) {
+    riscv._lw("a0", context.stack_map[ret.value]);
+}
+```

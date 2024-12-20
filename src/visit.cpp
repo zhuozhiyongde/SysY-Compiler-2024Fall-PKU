@@ -1,43 +1,13 @@
 #include "include/visit.hpp"
 
-// 寄存器计数器
-int reg_count = 0;
-// 符号到寄存器的映射，对二元表达式，可以以 lhs 或 rhs 为 key，获得其结果的寄存器
-unordered_map<koopa_raw_value_t, string> symbol_map;
-
+// Riscv 辅助类，用于生成 riscv 汇编代码
 Riscv riscv;
-
-string get_reg() {
-    // x0 是一个特殊的寄存器, 它的值恒为 0, 且向它写入的任何数据都会被丢弃.
-    // t0 到 t6 寄存器, 以及 a0 到 a7 寄存器可以用来存放临时值.
-    if (reg_count < 8) {
-        return "t" + to_string(reg_count);
-    }
-    else {
-        return "a" + to_string(reg_count - 8);
-    }
-}
-
-bool is_use_reg(const koopa_raw_value_t& value) {
-    if (value->kind.tag == KOOPA_RVT_INTEGER) {
-        if (value->kind.data.integer.value == 0) {
-            symbol_map[value] = "x0";
-            // 只有 0 的话，不需要占用新的寄存器
-            return false;
-        }
-        else {
-            // 说明是个立即数，需要加载到寄存器中
-            auto reg = get_reg();
-            riscv._li(reg, value->kind.data.integer.value);
-            symbol_map[value] = reg;
-            reg_count++;
-            // 由于存在一个中间结果，会占用一个寄存器
-            return true;
-        }
-    }
-    // 对于中间结果，会占用一个寄存器
-    return true;
-}
+// 全局 context 管理器
+ContextManager context_manager;
+// 当前函数对应的 context
+Context context;
+// 寄存器管理器
+RegisterManager register_manager;
 
 void visit(const koopa_raw_program_t& program) {
     // 访问所有全局变量
@@ -76,6 +46,23 @@ void visit(const koopa_raw_function_t& func) {
     // 忽略函数名前的@，@main -> main
     riscv_ofs << "\t.globl " << func->name + 1 << endl;
     riscv_ofs << func->name + 1 << ":" << endl;
+    int cnt = 0;
+    for (size_t i = 0; i < func->bbs.len; ++i) {
+        auto bb = reinterpret_cast<koopa_raw_basic_block_t>(func->bbs.buffer[i]);
+        cnt += bb->insts.len;
+        for (size_t j = 0; j < bb->insts.len; ++j) {
+            auto inst = reinterpret_cast<koopa_raw_value_t>(bb->insts.buffer[j]);
+            if (inst->ty->tag == KOOPA_RTT_UNIT) {
+                cnt -= 1;
+            }
+        }
+    }
+    cnt *= 4;
+    // 对齐到 16 的倍数
+    cnt = (cnt + 15) / 16 * 16;
+    context_manager.create(func->name + 1, cnt);
+    context = context_manager.get(func->name + 1);
+    riscv._addi("sp", "sp", -cnt);
     visit(func->bbs);
 };
 void visit(const koopa_raw_basic_block_t& bb) {
@@ -97,50 +84,87 @@ void visit(const koopa_raw_value_t& value) {
         // 用于后续在 symbol_map 中存储结果
         visit(kind.data.binary, value);
         break;
+    case KOOPA_RVT_ALLOC:
+        // 访问 alloc 指令，不管
+        break;
+    case KOOPA_RVT_STORE:
+        // 访问 store 指令
+        visit(kind.data.store);
+        break;
+    case KOOPA_RVT_LOAD:
+        // 访问 load 指令
+        visit(kind.data.load, value);
+        break;
     default:
         // 其他类型暂时遇不到
         cout << "Invalid instruction: " << kind.tag << endl;
         assert(false);
     }
 };
+
+void visit(const koopa_raw_load_t& load, const koopa_raw_value_t& value) {
+    register_manager.reset();
+    // 取一个临时的寄存器，不修改 reg_count
+    auto reg = register_manager.cur_reg();
+    auto bias = context.stack_used;
+    riscv._lw(reg, context.stack_map[load.src]);
+    context.push(value, bias);
+    context.stack_used += 4;
+    riscv._sw(reg, to_string(bias) + "(sp)");
+}
+
+void visit(const koopa_raw_store_t& store) {
+    register_manager.reset();
+    register_manager.get_operand_reg(store.value);
+    // 如果 dest 不在 stack_map 中，则需要分配新的空间
+    if (context.stack_map.find(store.dest) == context.stack_map.end()) {
+        context.stack_map[store.dest] = to_string(context.stack_used) + "(sp)";
+        context.stack_used += 4;
+    }
+    riscv._sw(register_manager.reg_map[store.value], context.stack_map[store.dest]);
+}
+
 void visit(const koopa_raw_return_t& ret) {
     // 形如 ret 1 直接返回整数的
     if (ret.value->kind.tag == KOOPA_RVT_INTEGER) {
         riscv._li("a0", ret.value->kind.data.integer.value);
-        riscv._ret();
     }
     // 形如 ret exp, 返回表达式的值
     else if (ret.value->kind.tag == KOOPA_RVT_BINARY) {
-        riscv._mv("a0", symbol_map[ret.value]);
-        riscv._ret();
+        riscv._lw("a0", context.stack_map[ret.value]);
+        // 或者使用 mv 指令，将寄存器中的值赋值给 a0
+        // riscv._mv("a0", register_manager.reg_map[ret.value]);
+    }
+    else if (ret.value->kind.tag == KOOPA_RVT_LOAD) {
+        riscv._lw("a0", context.stack_map[ret.value]);
     }
     else {
         riscv._li("a0", 0);
-        riscv._ret();
     }
+    riscv._addi("sp", "sp", context.stack_size);
+    riscv._ret();
 };
 void visit(const koopa_raw_binary_t& binary, const koopa_raw_value_t& value) {
     // 访问 binary 指令
-    bool lhs_use_reg = is_use_reg(binary.lhs);
-    bool rhs_use_reg = is_use_reg(binary.rhs);
+    bool lhs_use_reg = register_manager.get_operand_reg(binary.lhs);
+    bool rhs_use_reg = register_manager.get_operand_reg(binary.rhs);
 
     // 确定中间结果的寄存器
     // 如果两个都是整数，显然要新开一个寄存器，来存储中间结果
     if (!lhs_use_reg && !rhs_use_reg) {
-        symbol_map[value] = get_reg();
-        reg_count++;
+        register_manager.reg_map[value] = register_manager.new_reg();
     }
     // 对于其他情况，找一个已有寄存器来存储中间结果
     else if (lhs_use_reg) {
-        symbol_map[value] = symbol_map[binary.lhs];
+        register_manager.reg_map[value] = register_manager.reg_map[binary.lhs];
     }
     else {
-        symbol_map[value] = symbol_map[binary.rhs];
+        register_manager.reg_map[value] = register_manager.reg_map[binary.rhs];
     }
 
-    const auto cur = symbol_map[value];
-    const auto lhs = symbol_map[binary.lhs];
-    const auto rhs = symbol_map[binary.rhs];
+    const auto cur = register_manager.reg_map[value];
+    const auto lhs = register_manager.reg_map[binary.lhs];
+    const auto rhs = register_manager.reg_map[binary.rhs];
 
     switch (binary.op) {
     case KOOPA_RBO_EQ:
@@ -191,4 +215,8 @@ void visit(const koopa_raw_binary_t& binary, const koopa_raw_value_t& value) {
     default:
         riscv_ofs << "Invalid binary operation: " << koopaRawBinaryOpToString(binary.op) << endl;
     }
+    // 把结果存回栈中
+    context.stack_map[value] = to_string(context.stack_used) + "(sp)";
+    riscv._sw(cur, context.stack_map[value]);
+    context.stack_used += 4;
 }
