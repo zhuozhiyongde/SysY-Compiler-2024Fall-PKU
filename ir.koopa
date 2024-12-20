@@ -1,26 +1,115 @@
 fun @main(): i32 {
 %entry:
-	@x = alloc i32
-	@y = alloc i32
-	store 21, @y
-	%0 = load @y
-	%1 = add %0, 1
-	store %1, @x
-	%2 = load @x
-	%3 = sub 147, %2
-	@z = alloc i32
-	store %3, @z
-	%4 = load @y
-	%5 = sub 147, %4
-	@w = alloc i32
-	store %5, @w
-	%6 = load @w
-	%7 = mul %6, 1
-	%8 = mul %7, 1
-	%9 = mul %8, 1
-	store %9, @w
-	%10 = load @z
-	%11 = load @w
-	%12 = add %10, %11
-	ret %12
+	@a_1 = alloc i32
+	store 1, @a_1
+	@sum_1 = alloc i32
+	store 0, @sum_1
+	%0 = load @a_1
+	%1 = add %0, 2
+	store %1, @a_1
+	%2 = load @a_1
+	%3 = add %2, 3
+	@b_2 = alloc i32
+	store %3, @b_2
+	%4 = load @b_2
+	%5 = add %4, 4
+	store %5, @b_2
+	%6 = load @sum_1
+	%7 = load @a_1
+	%8 = add %6, %7
+	%9 = load @b_2
+	%10 = add %8, %9
+	store %10, @sum_1
+	%11 = load @b_2
+	%12 = add %11, 5
+	store %12, @b_2
+	%13 = load @b_2
+	%14 = add %13, 6
+	@c_3 = alloc i32
+	store %14, @c_3
+	%15 = load @a_1
+	%16 = load @c_3
+	%17 = add %15, %16
+	store %17, @a_1
+	%18 = load @sum_1
+	%19 = load @a_1
+	%20 = add %18, %19
+	%21 = load @b_2
+	%22 = add %20, %21
+	%23 = load @c_3
+	%24 = add %22, %23
+	store %24, @sum_1
+	%25 = load @b_2
+	%26 = load @a_1
+	%27 = add %25, %26
+	store %27, @b_2
+	%28 = load @c_3
+	%29 = add %28, 7
+	@a_4 = alloc i32
+	store %29, @a_4
+	%30 = load @a_4
+	%31 = add %30, 8
+	store %31, @a_4
+	%32 = load @sum_1
+	%33 = load @a_4
+	%34 = add %32, %33
+	%35 = load @b_2
+	%36 = add %34, %35
+	%37 = load @c_3
+	%38 = add %36, %37
+	store %38, @sum_1
+	%39 = load @b_2
+	%40 = load @a_4
+	%41 = add %39, %40
+	store %41, @b_2
+	%42 = load @c_3
+	%43 = add %42, 9
+	@b_5 = alloc i32
+	store %43, @b_5
+	%44 = load @a_4
+	%45 = add %44, 10
+	store %45, @a_4
+	%46 = load @b_5
+	%47 = add %46, 12
+	store %47, @b_5
+	%48 = load @sum_1
+	%49 = add %48, 11
+	%50 = load @b_5
+	%51 = add %49, %50
+	%52 = load @c_3
+	%53 = add %51, %52
+	store %53, @sum_1
+	%54 = load @c_3
+	%55 = load @b_5
+	%56 = add %54, %55
+	store %56, @c_3
+	%57 = load @b_5
+	%58 = add %57, 13
+	@c_6 = alloc i32
+	store %58, @c_6
+	%59 = load @c_6
+	%60 = add %59, 11
+	store %60, @c_6
+	%61 = load @sum_1
+	%62 = add %61, 11
+	%63 = load @b_5
+	%64 = add %62, %63
+	%65 = load @c_6
+	%66 = add %64, %65
+	store %66, @sum_1
+	%67 = load @sum_1
+	%68 = load @c_3
+	%69 = sub %67, %68
+	store %69, @sum_1
+	%70 = load @sum_1
+	%71 = load @b_2
+	%72 = sub %70, %71
+	store %72, @sum_1
+	%73 = load @sum_1
+	%74 = load @a_1
+	%75 = sub %73, %74
+	store %75, @sum_1
+	%76 = load @sum_1
+	%77 = mod %76, 77
+	ret %77
 }

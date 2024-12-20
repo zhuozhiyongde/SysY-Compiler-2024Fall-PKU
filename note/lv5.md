@@ -95,3 +95,7 @@ string SymbolTable::assign(const string& ident) {
 - 后者用于在当前层符号表中分配变量名。
 
 这两个函数在 `ast.cpp` 中区分定义和使用，定义时使用 `assign`，使用时使用 `locate`。
+
+## Riscv
+
+没有修改。
