@@ -1,4 +1,5 @@
 #pragma once
+
 #include "koopa.h"
 #include <cassert>
 #include <cstring>

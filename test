@@ -1,2 +1,0 @@
-make; build/compiler -riscv hello.c -o hello.s
-# autotest -riscv -s lv3 /root/compiler

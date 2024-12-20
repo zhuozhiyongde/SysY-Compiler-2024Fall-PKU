@@ -5,6 +5,10 @@
 #include <iostream>
 #include <fstream>
 #include <optional>
+#include <vector>
+#include <unordered_map>
+#include <cassert>
+#include "include/type.hpp"
 
 using namespace std;
 
@@ -12,38 +16,6 @@ extern string mode;
 extern ofstream debug_ofs;
 extern ofstream koopa_ofs;
 extern ofstream riscv_ofs;
-
-// 在使用前需要先声明（这里是有一次想要强类型尝试 unique_ptr 导致的，实际上暂时不需要）
-class CompUnitAST;
-class FuncDefAST;
-class FuncTypeAST;
-class BlockAST;
-class StmtAST;
-class ExpAST;
-class AddExpAST;
-class AddExpWithOpAST;
-class MulExpAST;
-class MulExpWithOpAST;
-class UnaryExpAST;
-class PrimaryExpAST;
-class UnaryExpWithOpAST;
-
-
-class Result {
-public:
-    enum class Type {
-        IMM,
-        REG
-    };
-    Type type;
-    int val;
-    friend ostream& operator<<(ostream& os, const Result& result) {
-        os << (result.type == Type::REG ? "%" : "") << result.val;
-        return os;
-    }
-    Result() : type(Type::IMM), val(0) {}
-    Result(Type type, int val) : type(type), val(val) {}
-};
 
 // 所有 AST 的基类
 class BaseAST {
@@ -77,13 +49,70 @@ public:
 
 class BlockAST : public BaseAST {
 public:
-    unique_ptr<BaseAST> stmt;
+    vector<unique_ptr<BaseAST>> block_items;
     Result print() const override;
 };
 
-class StmtAST : public BaseAST {
+class ConstDeclAST : public BaseAST {
+public:
+    vector<unique_ptr<BaseAST>> const_defs;
+    Result print() const override;
+};
+
+class ConstDefAST : public BaseAST {
+public:
+    string ident;
+    unique_ptr<BaseAST> value;
+    Result print() const override;
+};
+
+class ConstInitValAST : public BaseAST {
+public:
+    unique_ptr<BaseAST> const_exp;
+    Result print() const override;
+};
+
+class ConstExpAST : public BaseAST {
 public:
     unique_ptr<BaseAST> exp;
+    Result print() const override;
+};
+
+class VarDeclAST : public BaseAST {
+public:
+    vector<unique_ptr<BaseAST>> var_defs;
+    Result print() const override;
+};
+
+class VarDefAST : public BaseAST {
+public:
+    string ident;
+    optional<unique_ptr<BaseAST>> value;
+    Result print() const override;
+};
+
+class InitValAST : public BaseAST {
+public:
+    unique_ptr<BaseAST> exp;
+    Result print() const override;
+};
+
+class StmtAssignAST : public BaseAST {
+public:
+    unique_ptr<BaseAST> l_val;
+    unique_ptr<BaseAST> exp;
+    Result print() const override;
+};
+
+class StmtReturnAST : public BaseAST {
+public:
+    unique_ptr<BaseAST> exp;
+    Result print() const override;
+};
+
+class LValAST : public BaseAST {
+public:
+    string ident;
     Result print() const override;
 };
 
@@ -95,16 +124,13 @@ public:
 
 class LOrExpAST : public BaseAST {
 public:
-    optional<unique_ptr<BaseAST>> l_and_exp;
-    optional<unique_ptr<BaseAST>> l_exp_with_op;
+    unique_ptr<BaseAST> l_and_exp;
     Result print() const override;
 };
 
-
 class LAndExpAST : public BaseAST {
 public:
-    optional<unique_ptr<BaseAST>> eq_exp;
-    optional<unique_ptr<BaseAST>> l_exp_with_op;
+    unique_ptr<BaseAST> eq_exp;
     Result print() const override;
 };
 
@@ -122,8 +148,7 @@ public:
 
 class EqExpAST : public BaseAST {
 public:
-    optional<unique_ptr<BaseAST>> rel_exp;
-    optional<unique_ptr<BaseAST>> eq_exp_with_op;
+    unique_ptr<BaseAST> rel_exp;
     Result print() const override;
 };
 
@@ -142,8 +167,7 @@ public:
 
 class RelExpAST : public BaseAST {
 public:
-    optional<unique_ptr<BaseAST>> add_exp;
-    optional<unique_ptr<BaseAST>> rel_exp_with_op;
+    unique_ptr<BaseAST> add_exp;
     Result print() const override;
 };
 
@@ -164,8 +188,7 @@ public:
 
 class AddExpAST : public BaseAST {
 public:
-    optional<unique_ptr<BaseAST>> mul_exp;
-    optional<unique_ptr<BaseAST>> add_exp_with_op;
+    unique_ptr<BaseAST> mul_exp;
     Result print() const override;
 };
 
@@ -184,8 +207,7 @@ public:
 
 class MulExpAST : public BaseAST {
 public:
-    optional<unique_ptr<BaseAST>> unary_exp;
-    optional<unique_ptr<BaseAST>> mul_exp_with_op;
+    unique_ptr<BaseAST> unary_exp;
     Result print() const override;
 };
 
@@ -205,17 +227,10 @@ public:
 
 class UnaryExpAST : public BaseAST {
 public:
-    optional<unique_ptr<BaseAST>> primary_exp;
-    optional<unique_ptr<BaseAST>> unary_exp_with_op;
+    unique_ptr<BaseAST> primary_exp;
     Result print() const override;
 };
 
-class PrimaryExpAST : public BaseAST {
-public:
-    optional<unique_ptr<BaseAST>> exp;
-    optional<int> number;
-    Result print() const override;
-};
 
 class UnaryExpWithOpAST : public BaseAST {
 public:
@@ -227,5 +242,23 @@ public:
     UnaryOp unary_op;
     unique_ptr<BaseAST> unary_exp;
     UnaryOp convert(const string& op) const;
+    Result print() const override;
+};
+
+class PrimaryExpAST : public BaseAST {
+public:
+    unique_ptr<BaseAST> exp;
+    Result print() const override;
+};
+
+class PrimaryExpWithNumberAST : public BaseAST {
+public:
+    int number;
+    Result print() const override;
+};
+
+class PrimaryExpWithLValAST : public BaseAST {
+public:
+    unique_ptr<BaseAST> l_val;
     Result print() const override;
 };

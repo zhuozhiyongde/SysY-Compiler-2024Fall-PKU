@@ -1,6 +1,7 @@
 #include "include/ast.hpp"
 
 int TEMP_COUNT = 0;
+SymbolTable symbol_table;
 
 Result CompUnitAST::print() const {
   return func_def->print();
@@ -22,15 +23,90 @@ Result FuncTypeAST::print() const {
 
 Result BlockAST::print() const {
   koopa_ofs << "%entry:" << endl;
-  stmt->print();
+  for (auto& item : block_items) {
+    if (!symbol_table.get_returned()) {
+      item->print();
+    }
+  }
   return Result();
 }
 
-Result StmtAST::print() const {
-  Result result = exp->print();
-  koopa_ofs << "\tret " << result;
-  koopa_ofs << endl;
+Result ConstDeclAST::print() const {
+  for (auto& item : const_defs) {
+    item->print();
+  }
   return Result();
+}
+
+Result ConstDefAST::print() const {
+  assert(!symbol_table.exist(ident));
+  Result value_result = value->print();
+  symbol_table.create(ident, VAL_(value_result.value));
+  return Result();
+}
+
+Result ConstInitValAST::print() const {
+  return const_exp->print();
+}
+
+Result ConstExpAST::print() const {
+  return exp->print();
+}
+
+Result VarDeclAST::print() const {
+  for (auto& item : var_defs) {
+    item->print();
+  }
+  return Result();
+}
+
+Result VarDefAST::print() const {
+  if (value) {
+    Result value_result = (*value)->print();
+    koopa_ofs << "\t@" << ident << " = alloc i32" << endl;
+    koopa_ofs << "\tstore " << value_result << ", @" << ident << endl;
+    symbol_table.create(ident, VAR_);
+  }
+  else {
+    koopa_ofs << "\t@" << ident << " = alloc i32" << endl;
+    symbol_table.create(ident, VAR_);
+  }
+  return Result();
+}
+
+Result InitValAST::print() const {
+  return exp->print();
+}
+
+Result StmtAssignAST::print() const {
+  auto ident = ((LValAST*)l_val.get())->ident;
+  assert(symbol_table.exist(ident));
+  Result exp_result = exp->print();
+  koopa_ofs << "\tstore " << exp_result << ", @" << ident << endl;
+  return Result();
+}
+
+Result StmtReturnAST::print() const {
+  Result exp_result = exp->print();
+  koopa_ofs << "\tret " << exp_result << endl;
+  symbol_table.set_returned(true);
+  return Result();
+}
+
+Result LValAST::print() const {
+  assert(symbol_table.exist(ident));
+  auto symbol = symbol_table.read(ident);
+  if (symbol.type == Symbol::Type::VAR) {
+    Result result = REG_(TEMP_COUNT++);
+    koopa_ofs << "\t" << result << " = load @" << ident << endl;
+    return result;
+  }
+  else if (symbol.type == Symbol::Type::VAL) {
+    return IMM_(symbol.value);
+  }
+  else {
+    assert(false);
+  }
 }
 
 Result ExpAST::print() const {
@@ -38,53 +114,42 @@ Result ExpAST::print() const {
 }
 
 Result LOrExpAST::print() const {
-  if (l_and_exp) {
-    return (*l_and_exp)->print();
-  }
-  else if (l_exp_with_op) {
-    return (*l_exp_with_op)->print();
-  }
-  return Result();
+  return l_and_exp->print();
 }
 
 Result LAndExpAST::print() const {
-  if (eq_exp) {
-    return (*eq_exp)->print();
-  }
-  else if (l_exp_with_op) {
-    return (*l_exp_with_op)->print();
-  }
-  return Result();
+  return eq_exp->print();
 }
 
 Result LExpWithOpAST::print() const {
-  Result left_result = left->print();
-  Result right_result = right->print();
-  Result result = Result(Result::Type::REG, TEMP_COUNT++);
-  if (logical_op == LogicalOp::LOGICAL_OR) {
-    Result temp = Result(Result::Type::REG, TEMP_COUNT++);
-    koopa_ofs << "\t" << temp << " = or " << left_result << ", " << right_result << endl;
-    koopa_ofs << "\t" << result << " = ne " << temp << ", 0" << endl;
+  Result lhs = left->print();
+  Result rhs = right->print();
+  if (lhs.type == Result::Type::IMM && rhs.type == Result::Type::IMM) {
+    switch (logical_op) {
+    case LogicalOp::LOGICAL_OR:
+      return IMM_(lhs.value || rhs.value);
+    case LogicalOp::LOGICAL_AND:
+      return IMM_(lhs.value && rhs.value);
+    default:
+      assert(false);
+    }
   }
-  else if (logical_op == LogicalOp::LOGICAL_AND) {
-    Result temp_1 = Result(Result::Type::REG, TEMP_COUNT++);
-    Result temp_2 = Result(Result::Type::REG, TEMP_COUNT++);
-    koopa_ofs << "\t" << temp_1 << " = ne " << left_result << ", 0" << endl;
-    koopa_ofs << "\t" << temp_2 << " = ne " << right_result << ", 0" << endl;
-    koopa_ofs << "\t" << result << " = and " << temp_1 << ", " << temp_2 << endl;
+  else {
+    Result result = REG_(TEMP_COUNT++);
+    if (logical_op == LogicalOp::LOGICAL_OR) {
+      Result temp = REG_(TEMP_COUNT++);
+      koopa_ofs << "\t" << temp << " = or " << lhs << ", " << rhs << endl;
+      koopa_ofs << "\t" << result << " = ne " << temp << ", 0" << endl;
+    }
+    else if (logical_op == LogicalOp::LOGICAL_AND) {
+      Result temp_1 = REG_(TEMP_COUNT++);
+      Result temp_2 = REG_(TEMP_COUNT++);
+      koopa_ofs << "\t" << temp_1 << " = ne " << lhs << ", 0" << endl;
+      koopa_ofs << "\t" << temp_2 << " = ne " << rhs << ", 0" << endl;
+      koopa_ofs << "\t" << result << " = and " << temp_1 << ", " << temp_2 << endl;
+    }
+    return result;
   }
-
-  return result;
-}
-
-Result EqExpAST::print() const {
-  if (rel_exp) {
-    return (*rel_exp)->print();
-  }
-  else if (eq_exp_with_op) {
-    return (*eq_exp_with_op)->print();
-  }
-  return Result();
 }
 
 EqExpWithOpAST::EqOp EqExpWithOpAST::convert(const string& op) const {
@@ -97,27 +162,41 @@ EqExpWithOpAST::EqOp EqExpWithOpAST::convert(const string& op) const {
   throw runtime_error("Invalid operator: " + op);
 }
 
+Result EqExpAST::print() const {
+  return rel_exp->print();
+}
+
 Result EqExpWithOpAST::print() const {
-  Result left_result = left->print();
-  Result right_result = right->print();
-  Result result = Result(Result::Type::REG, TEMP_COUNT++);
-  if (eq_op == EqOp::EQ) {
-    koopa_ofs << "\t" << result << " = eq " << left_result << ", " << right_result << endl;
+  Result lhs = left->print();
+  Result rhs = right->print();
+  if (lhs.type == Result::Type::IMM && rhs.type == Result::Type::IMM) {
+    switch (eq_op) {
+    case EqOp::EQ:
+      return IMM_(lhs.value == rhs.value);
+    case EqOp::NEQ:
+      return IMM_(lhs.value != rhs.value);
+    default:
+      assert(false);
+    }
   }
-  else if (eq_op == EqOp::NEQ) {
-    koopa_ofs << "\t" << result << " = ne " << left_result << ", " << right_result << endl;
+  else {
+    Result result = REG_(TEMP_COUNT++);
+    switch (eq_op) {
+    case EqOp::EQ:
+      koopa_ofs << "\t" << result << " = eq " << lhs << ", " << rhs << endl;
+      break;
+    case EqOp::NEQ:
+      koopa_ofs << "\t" << result << " = ne " << lhs << ", " << rhs << endl;
+      break;
+    default:
+      assert(false);
+    }
+    return result;
   }
-  return result;
 }
 
 Result RelExpAST::print() const {
-  if (add_exp) {
-    return (*add_exp)->print();
-  }
-  else if (rel_exp_with_op) {
-    return (*rel_exp_with_op)->print();
-  }
-  return Result();
+  return add_exp->print();
 }
 
 RelExpWithOpAST::RelOp RelExpWithOpAST::convert(const string& op) const {
@@ -137,32 +216,42 @@ RelExpWithOpAST::RelOp RelExpWithOpAST::convert(const string& op) const {
 }
 
 Result RelExpWithOpAST::print() const {
-  Result left_result = left->print();
-  Result right_result = right->print();
-  Result result = Result(Result::Type::REG, TEMP_COUNT++);
-  if (rel_op == RelOp::LE) {
-    koopa_ofs << "\t" << result << " = le " << left_result << ", " << right_result << endl;
+  Result lhs = left->print();
+  Result rhs = right->print();
+  if (lhs.type == Result::Type::IMM && rhs.type == Result::Type::IMM) {
+    switch (rel_op) {
+    case RelOp::LE:
+      return IMM_(lhs.value <= rhs.value);
+    case RelOp::GE:
+      return IMM_(lhs.value >= rhs.value);
+    case RelOp::LT:
+      return IMM_(lhs.value < rhs.value);
+    case RelOp::GT:
+      return IMM_(lhs.value > rhs.value);
+    default:
+      assert(false);
+    }
   }
-  else if (rel_op == RelOp::GE) {
-    koopa_ofs << "\t" << result << " = ge " << left_result << ", " << right_result << endl;
+  else {
+    Result result = Result(Result::Type::REG, TEMP_COUNT++);
+    if (rel_op == RelOp::LE) {
+      koopa_ofs << "\t" << result << " = le " << lhs << ", " << rhs << endl;
+    }
+    else if (rel_op == RelOp::GE) {
+      koopa_ofs << "\t" << result << " = ge " << lhs << ", " << rhs << endl;
+    }
+    else if (rel_op == RelOp::LT) {
+      koopa_ofs << "\t" << result << " = lt " << lhs << ", " << rhs << endl;
+    }
+    else if (rel_op == RelOp::GT) {
+      koopa_ofs << "\t" << result << " = gt " << lhs << ", " << rhs << endl;
+    }
+    return result;
   }
-  else if (rel_op == RelOp::LT) {
-    koopa_ofs << "\t" << result << " = lt " << left_result << ", " << right_result << endl;
-  }
-  else if (rel_op == RelOp::GT) {
-    koopa_ofs << "\t" << result << " = gt " << left_result << ", " << right_result << endl;
-  }
-  return result;
 }
 
 Result AddExpAST::print() const {
-  if (mul_exp) {
-    return (*mul_exp)->print();
-  }
-  else if (add_exp_with_op) {
-    return (*add_exp_with_op)->print();
-  }
-  return Result();
+  return mul_exp->print();
 }
 
 AddExpWithOpAST::AddOp AddExpWithOpAST::convert(const string& op) const {
@@ -176,26 +265,36 @@ AddExpWithOpAST::AddOp AddExpWithOpAST::convert(const string& op) const {
 }
 
 Result AddExpWithOpAST::print() const {
-  Result left_result = left->print();
-  Result right_result = right->print();
-  Result result = Result(Result::Type::REG, TEMP_COUNT++);
-  if (add_op == AddOp::ADD) {
-    koopa_ofs << "\t" << result << " = add " << left_result << ", " << right_result << endl;
+  Result lhs = left->print();
+  Result rhs = right->print();
+  if (lhs.type == Result::Type::IMM && rhs.type == Result::Type::IMM) {
+    switch (add_op) {
+    case AddOp::ADD:
+      return IMM_(lhs.value + rhs.value);
+    case AddOp::SUB:
+      return IMM_(lhs.value - rhs.value);
+    default:
+      assert(false);
+    }
   }
-  else if (add_op == AddOp::SUB) {
-    koopa_ofs << "\t" << result << " = sub " << left_result << ", " << right_result << endl;
+  else {
+    Result result = Result(Result::Type::REG, TEMP_COUNT++);
+    switch (add_op) {
+    case AddOp::ADD:
+      koopa_ofs << "\t" << result << " = add " << lhs << ", " << rhs << endl;
+      break;
+    case AddOp::SUB:
+      koopa_ofs << "\t" << result << " = sub " << lhs << ", " << rhs << endl;
+      break;
+    default:
+      assert(false);
+    }
+    return result;
   }
-  return result;
 }
 
 Result MulExpAST::print() const {
-  if (unary_exp) {
-    return (*unary_exp)->print();
-  }
-  else if (mul_exp_with_op) {
-    return (*mul_exp_with_op)->print();
-  }
-  return Result();
+  return unary_exp->print();
 }
 
 MulExpWithOpAST::MulOp MulExpWithOpAST::convert(const string& op) const {
@@ -212,40 +311,41 @@ MulExpWithOpAST::MulOp MulExpWithOpAST::convert(const string& op) const {
 }
 
 Result MulExpWithOpAST::print() const {
-  Result left_result = left->print();
-  Result right_result = right->print();
-  Result result = Result(Result::Type::REG, TEMP_COUNT++);
-  if (mul_op == MulOp::MUL) {
-    koopa_ofs << "\t" << result << " = mul " << left_result << ", " << right_result << endl;
+  Result lhs = left->print();
+  Result rhs = right->print();
+  if (lhs.type == Result::Type::IMM && rhs.type == Result::Type::IMM) {
+    switch (mul_op) {
+    case MulOp::MUL:
+      return IMM_(lhs.value * rhs.value);
+    case MulOp::DIV:
+      return IMM_(lhs.value / rhs.value);
+    case MulOp::MOD:
+      return IMM_(lhs.value % rhs.value);
+    default:
+      assert(false);
+    }
   }
-  else if (mul_op == MulOp::DIV) {
-    koopa_ofs << "\t" << result << " = div " << left_result << ", " << right_result << endl;
+  else {
+    Result result = Result(Result::Type::REG, TEMP_COUNT++);
+    switch (mul_op) {
+    case MulOp::MUL:
+      koopa_ofs << "\t" << result << " = mul " << lhs << ", " << rhs << endl;
+      break;
+    case MulOp::DIV:
+      koopa_ofs << "\t" << result << " = div " << lhs << ", " << rhs << endl;
+      break;
+    case MulOp::MOD:
+      koopa_ofs << "\t" << result << " = mod " << lhs << ", " << rhs << endl;
+      break;
+    default:
+      assert(false);
+    }
+    return result;
   }
-  else if (mul_op == MulOp::MOD) {
-    koopa_ofs << "\t" << result << " = mod " << left_result << ", " << right_result << endl;
-  }
-  return result;
 }
 
 Result UnaryExpAST::print() const {
-  if (primary_exp) {
-    return (*primary_exp)->print();
-  }
-  else if (unary_exp_with_op) {
-    return (*unary_exp_with_op)->print();
-  }
-  return Result();
-}
-
-Result PrimaryExpAST::print() const {
-  if (exp) {
-    return (*exp)->print();
-  }
-  else if (number) {
-    Result result = Result(Result::Type::IMM, *number);
-    return result;
-  }
-  return Result();
+  return primary_exp->print();
 }
 
 UnaryExpWithOpAST::UnaryOp UnaryExpWithOpAST::convert(const string& op) const {
@@ -262,18 +362,47 @@ UnaryExpWithOpAST::UnaryOp UnaryExpWithOpAST::convert(const string& op) const {
 }
 
 Result UnaryExpWithOpAST::print() const {
-  Result result = Result(Result::Type::REG, TEMP_COUNT++);
-  if (unary_op == UnaryOp::POSITIVE) {
-    Result unary_exp_result = unary_exp->print();
-    koopa_ofs << "\t" << result << " = add 0, " << unary_exp_result << endl;
+  Result unary_exp_result = unary_exp->print();
+  if (unary_exp_result.type == Result::Type::IMM) {
+    switch (unary_op) {
+    case UnaryOp::POSITIVE:
+      return IMM_(unary_exp_result.value);
+    case UnaryOp::NEGATIVE:
+      return IMM_(-unary_exp_result.value);
+    case UnaryOp::NOT:
+      return IMM_(!unary_exp_result.value);
+    default:
+      assert(false);
+    }
   }
-  else if (unary_op == UnaryOp::NEGATIVE) {
-    Result unary_exp_result = unary_exp->print();
-    koopa_ofs << "\t" << result << " = sub 0, " << unary_exp_result << endl;
+  else {
+    Result result = REG_(TEMP_COUNT++);
+    switch (unary_op) {
+    case UnaryOp::POSITIVE:
+      koopa_ofs << "\t" << result << " = add 0, " << unary_exp_result << endl;
+      break;
+    case UnaryOp::NEGATIVE:
+      koopa_ofs << "\t" << result << " = sub 0, " << unary_exp_result << endl;
+      break;
+    case UnaryOp::NOT:
+      koopa_ofs << "\t" << result << " = eq 0, " << unary_exp_result << endl;
+      break;
+    default:
+      assert(false);
+    }
+    return result;
   }
-  else if (unary_op == UnaryOp::NOT) {
-    Result unary_exp_result = unary_exp->print();
-    koopa_ofs << "\t" << result << " = eq 0, " << unary_exp_result << endl;
-  }
-  return result;
+}
+
+
+Result PrimaryExpAST::print() const {
+  return exp->print();
+}
+
+Result PrimaryExpWithNumberAST::print() const {
+  return IMM_(number);
+}
+
+Result PrimaryExpWithLValAST::print() const {
+  return l_val->print();
 }

@@ -1,3 +1,4 @@
 int main() {
-  return 10 >= 7;
+  return 0;
+  return 1;
 }
