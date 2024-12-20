@@ -1,7 +1,8 @@
 #include "include/ast.hpp"
 
 int TEMP_COUNT = 0;
-SymbolTable symbol_table;
+SymbolTable global_symbol_table;
+SymbolTable* local_symbol_table = &global_symbol_table;
 
 Result CompUnitAST::print() const {
   return func_def->print();
@@ -11,6 +12,7 @@ Result FuncDefAST::print() const {
   koopa_ofs << "fun @" << ident << "(): ";
   func_type->print();
   koopa_ofs << " {" << endl;
+  koopa_ofs << "%entry:" << endl;
   block->print();
   koopa_ofs << "}" << endl;
   return Result();
@@ -22,12 +24,16 @@ Result FuncTypeAST::print() const {
 }
 
 Result BlockAST::print() const {
-  koopa_ofs << "%entry:" << endl;
+  SymbolTable* parent_symbol_table = local_symbol_table;
+  local_symbol_table = new SymbolTable();
+  local_symbol_table->set_parent(parent_symbol_table);
   for (auto& item : block_items) {
-    if (!symbol_table.get_returned()) {
+    if (!local_symbol_table->get_returned()) {
       item->print();
     }
   }
+  delete local_symbol_table;
+  local_symbol_table = parent_symbol_table;
   return Result();
 }
 
@@ -39,9 +45,9 @@ Result ConstDeclAST::print() const {
 }
 
 Result ConstDefAST::print() const {
-  assert(!symbol_table.exist(ident));
+  string ident_with_suffix = local_symbol_table->assign(ident);
   Result value_result = value->print();
-  symbol_table.create(ident, VAL_(value_result.value));
+  local_symbol_table->create(ident_with_suffix, VAL_(value_result.value));
   return Result();
 }
 
@@ -61,15 +67,16 @@ Result VarDeclAST::print() const {
 }
 
 Result VarDefAST::print() const {
+  string ident_with_suffix = local_symbol_table->assign(ident);
   if (value) {
     Result value_result = (*value)->print();
-    koopa_ofs << "\t@" << ident << " = alloc i32" << endl;
-    koopa_ofs << "\tstore " << value_result << ", @" << ident << endl;
-    symbol_table.create(ident, VAR_);
+    koopa_ofs << "\t@" << ident_with_suffix << " = alloc i32" << endl;
+    koopa_ofs << "\tstore " << value_result << ", @" << ident_with_suffix << endl;
+    local_symbol_table->create(ident_with_suffix, VAR_);
   }
   else {
-    koopa_ofs << "\t@" << ident << " = alloc i32" << endl;
-    symbol_table.create(ident, VAR_);
+    koopa_ofs << "\t@" << ident_with_suffix << " = alloc i32" << endl;
+    local_symbol_table->create(ident_with_suffix, VAR_);
   }
   return Result();
 }
@@ -80,25 +87,43 @@ Result InitValAST::print() const {
 
 Result StmtAssignAST::print() const {
   auto ident = ((LValAST*)l_val.get())->ident;
-  assert(symbol_table.exist(ident));
+  string ident_with_suffix = local_symbol_table->locate(ident);
+  assert(local_symbol_table->exist(ident_with_suffix));
   Result exp_result = exp->print();
-  koopa_ofs << "\tstore " << exp_result << ", @" << ident << endl;
+  koopa_ofs << "\tstore " << exp_result << ", @" << ident_with_suffix << endl;
   return Result();
 }
 
+Result StmtExpAST::print() const {
+  if (exp) {
+    return (*exp)->print();
+  }
+  return Result();
+}
+
+Result StmtBlockAST::print() const {
+  return block->print();
+}
+
 Result StmtReturnAST::print() const {
-  Result exp_result = exp->print();
-  koopa_ofs << "\tret " << exp_result << endl;
-  symbol_table.set_returned(true);
+  if (exp) {
+    Result exp_result = (*exp)->print();
+    koopa_ofs << "\tret " << exp_result << endl;
+  }
+  else {
+    koopa_ofs << "\tret" << endl;
+  }
+  local_symbol_table->set_returned(true);
   return Result();
 }
 
 Result LValAST::print() const {
-  assert(symbol_table.exist(ident));
-  auto symbol = symbol_table.read(ident);
+  string ident_with_suffix = local_symbol_table->locate(ident);
+  assert(local_symbol_table->exist(ident_with_suffix));
+  auto symbol = local_symbol_table->read(ident_with_suffix);
   if (symbol.type == Symbol::Type::VAR) {
     Result result = REG_(TEMP_COUNT++);
-    koopa_ofs << "\t" << result << " = load @" << ident << endl;
+    koopa_ofs << "\t" << result << " = load @" << ident_with_suffix << endl;
     return result;
   }
   else if (symbol.type == Symbol::Type::VAL) {

@@ -99,11 +99,18 @@ Block
   : '{' BlockItem ExtendBlockItem '}' {
     auto ast = new BlockAST();
     auto block_item = $2;
+    // 这里是传递了指针，而不是值，真实的 vec 当前还存在于 ExtendBlockItemAST 中，通过使用指针，我们可以先避免大量拷贝
     vector<unique_ptr<BaseAST>> *vec = $3;
     ast->block_items.push_back(unique_ptr<BaseAST>(block_item));
     for (auto& ptr : *vec) {
+      // 现在把 vec 的值移动到当前的 BlockAST 中
       ast->block_items.push_back(std::move(ptr));
     }
+    $$ = ast;
+  }
+  | '{' '}'{
+    auto ast = new BlockAST();
+    ast->block_items = vector<unique_ptr<BaseAST>>();
     $$ = ast;
   }
   ;
@@ -242,9 +249,27 @@ Stmt
     ast->exp = unique_ptr<BaseAST>($3);
     $$ = ast;
   }
+  | Exp ';'{
+    auto ast = new StmtExpAST();
+    ast->exp = unique_ptr<BaseAST>($1);
+    $$ = ast;
+  }
+  | ';'{
+    auto ast = new StmtExpAST();
+    $$ = ast;
+  }
+  | Block {
+    auto ast = new StmtBlockAST();
+    ast->block = unique_ptr<BaseAST>($1);
+    $$ = ast;
+  }
   | RETURN Exp ';' {
     auto ast = new StmtReturnAST();
     ast->exp = unique_ptr<BaseAST>($2);
+    $$ = ast;
+  }
+  | RETURN ';' {
+    auto ast = new StmtReturnAST();
     $$ = ast;
   }
   ;

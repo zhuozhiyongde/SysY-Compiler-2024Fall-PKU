@@ -1,6 +1,6 @@
 #include "include/utils.hpp"
 
-std::string koopaRawValueTagToString(int tag) {
+string koopaRawValueTagToString(int tag) {
     switch (tag) {
     case koopa_raw_value_tag_t::KOOPA_RVT_INTEGER:
         return "KOOPA_RVT_INTEGER";
@@ -42,7 +42,7 @@ std::string koopaRawValueTagToString(int tag) {
 }
 
 
-std::string koopaRawBinaryOpToString(int op) {
+string koopaRawBinaryOpToString(int op) {
     switch (op) {
     case koopa_raw_binary_op_t::KOOPA_RBO_EQ:
         return "KOOPA_RBO_EQ";

@@ -3,6 +3,8 @@
 #include <string>
 #include "koopa.h"
 
-std::string koopaRawValueTagToString(int tag);
+using namespace std;
 
-std::string koopaRawBinaryOpToString(int op);
+string koopaRawValueTagToString(int tag);
+
+string koopaRawBinaryOpToString(int op);

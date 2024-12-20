@@ -104,9 +104,21 @@ public:
     Result print() const override;
 };
 
+class StmtExpAST : public BaseAST {
+public:
+    optional<unique_ptr<BaseAST>> exp;
+    Result print() const override;
+};
+
 class StmtReturnAST : public BaseAST {
 public:
-    unique_ptr<BaseAST> exp;
+    optional<unique_ptr<BaseAST>> exp;
+    Result print() const override;
+};
+
+class StmtBlockAST : public BaseAST {
+public:
+    unique_ptr<BaseAST> block;
     Result print() const override;
 };
 
