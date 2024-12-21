@@ -145,6 +145,7 @@ void visit(const koopa_raw_return_t& ret) {
     riscv._ret();
 };
 void visit(const koopa_raw_binary_t& binary, const koopa_raw_value_t& value) {
+    register_manager.reset();
     // 访问 binary 指令
     bool lhs_use_reg = register_manager.get_operand_reg(binary.lhs);
     bool rhs_use_reg = register_manager.get_operand_reg(binary.rhs);
