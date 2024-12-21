@@ -96,6 +96,8 @@ Result InitValAST::print() const {
 Result StmtIfAST::print() const {
   Result exp_result = exp->print();
   SymbolTable* parent_symbol_table = local_symbol_table;
+  local_symbol_table = new SymbolTable();
+  local_symbol_table->set_parent(parent_symbol_table);
 
   string then_label = frontend_context_manager.get_then_label();
   string else_label = frontend_context_manager.get_else_label();
@@ -118,6 +120,8 @@ Result StmtIfAST::print() const {
     koopa_ofs << "\tjump " << end_label << endl;
   }
   koopa_ofs << end_label << ":" << endl;
+  delete local_symbol_table;
+  local_symbol_table = parent_symbol_table;
   return Result();
 }
 

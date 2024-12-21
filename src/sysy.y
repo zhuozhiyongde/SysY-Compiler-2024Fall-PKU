@@ -253,69 +253,53 @@ Stmt
 
 MatchedStmt
   : IF '(' Exp ')' MatchedStmt ELSE MatchedStmt {
-    auto ast = new BlockAST();
-    auto block_item = new StmtIfAST();
-    block_item->exp = unique_ptr<BaseAST>($3);
-    block_item->then_stmt = unique_ptr<BaseAST>($5);
-    block_item->else_stmt = unique_ptr<BaseAST>($7);
-    ast->block_items.push_back(unique_ptr<BaseAST>(block_item));
+    auto ast = new StmtIfAST();
+    ast->exp = unique_ptr<BaseAST>($3);
+    ast->then_stmt = unique_ptr<BaseAST>($5);
+    ast->else_stmt = unique_ptr<BaseAST>($7);
     $$ = ast;
   }
   | LVal '=' Exp ';' {
-    auto ast = new BlockAST();
-    auto block_item = new StmtAssignAST();
-    block_item->l_val = unique_ptr<BaseAST>($1);
-    block_item->exp = unique_ptr<BaseAST>($3);
-    ast->block_items.push_back(unique_ptr<BaseAST>(block_item));
+    auto ast = new StmtAssignAST();
+    ast->l_val = unique_ptr<BaseAST>($1);
+    ast->exp = unique_ptr<BaseAST>($3);
     $$ = ast;
   }
   | Exp ';'{
-    auto ast = new BlockAST();
-    auto block_item = new StmtExpAST();
-    block_item->exp = unique_ptr<BaseAST>($1);
-    ast->block_items.push_back(unique_ptr<BaseAST>(block_item));
+    auto ast = new StmtExpAST();
+    ast->exp = unique_ptr<BaseAST>($1);
     $$ = ast;
   }
   | ';'{
-    auto ast = new BlockAST();
-    auto block_item = new StmtExpAST();
-    ast->block_items.push_back(unique_ptr<BaseAST>(block_item));
+    auto ast = new StmtExpAST();
     $$ = ast;
   }
   | Block {
     $$ = $1;
   }
   | RETURN Exp ';' {
-    auto ast = new BlockAST();
-    auto block_item = new StmtReturnAST();
-    block_item->exp = unique_ptr<BaseAST>($2);
-    ast->block_items.push_back(unique_ptr<BaseAST>(block_item));
+    auto ast = new StmtReturnAST();
+    ast->exp = unique_ptr<BaseAST>($2);
     $$ = ast;
   }
   | RETURN ';' {
-    auto ast = new BlockAST();
-    auto block_item = new StmtReturnAST();
-    ast->block_items.push_back(unique_ptr<BaseAST>(block_item));
+    auto ast = new StmtReturnAST();
     $$ = ast;
   }
   ;
 
 OpenStmt
   : IF '(' Exp ')' Stmt {
-    auto ast = new BlockAST();
-    auto block_item = new StmtIfAST();
-    block_item->exp = unique_ptr<BaseAST>($3);
-    block_item->then_stmt = unique_ptr<BaseAST>($5);
-    ast->block_items.push_back(unique_ptr<BaseAST>(block_item));
+    auto ast = new StmtIfAST();
+    ast->exp = unique_ptr<BaseAST>($3);
+    ast->then_stmt = unique_ptr<BaseAST>($5);
     $$ = ast;
   }
   | IF '(' Exp ')' MatchedStmt ELSE OpenStmt {
-    auto ast = new BlockAST();
-    auto block_item = new StmtIfAST();
-    block_item->exp = unique_ptr<BaseAST>($3);
-    block_item->then_stmt = unique_ptr<BaseAST>($5);
-    block_item->else_stmt = unique_ptr<BaseAST>($7);
-    ast->block_items.push_back(unique_ptr<BaseAST>(block_item));
+    auto ast = new StmtIfAST();
+    ast->exp = unique_ptr<BaseAST>($3);
+    ast->then_stmt = unique_ptr<BaseAST>($5);
+    ast->else_stmt = unique_ptr<BaseAST>($7);
     $$ = ast;
   }
   ;
