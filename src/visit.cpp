@@ -63,10 +63,13 @@ void visit(const koopa_raw_function_t& func) {
     context_manager.create(func->name + 1, cnt);
     context = context_manager.get(func->name + 1);
     riscv._add_sp(-cnt);
+    // 检查是否超过 imm12 的限制
+    // context.stack_used = 4000;
     visit(func->bbs);
 };
 void visit(const koopa_raw_basic_block_t& bb) {
     // 访问所有指令，insts: instruction slice
+    riscv_ofs << bb->name + 1 << ":" << endl;
     visit(bb->insts);
 };
 void visit(const koopa_raw_value_t& value) {
@@ -95,12 +98,29 @@ void visit(const koopa_raw_value_t& value) {
         // 访问 load 指令
         visit(kind.data.load, value);
         break;
+    case KOOPA_RVT_BRANCH:
+        // 访问 branch 指令
+        visit(kind.data.branch);
+        break;
+    case KOOPA_RVT_JUMP:
+        // 访问 jump 指令
+        visit(kind.data.jump);
+        break;
     default:
         // 其他类型暂时遇不到
         cout << "Invalid instruction: " << kind.tag << endl;
         assert(false);
     }
 };
+
+void visit(const koopa_raw_branch_t& branch) {
+    // 访问 branch 指令
+    register_manager.reset();
+    register_manager.get_operand_reg(branch.cond);
+    auto cond = register_manager.reg_map[branch.cond];
+    riscv._bnez(cond, branch.true_bb->name + 1);
+    riscv._beqz(cond, branch.false_bb->name + 1);
+}
 
 void visit(const koopa_raw_load_t& load, const koopa_raw_value_t& value) {
     register_manager.reset();
@@ -111,6 +131,10 @@ void visit(const koopa_raw_load_t& load, const koopa_raw_value_t& value) {
     context.push(value, bias);
     context.stack_used += 4;
     riscv._sw(reg, "sp", bias);
+}
+
+void visit(const koopa_raw_jump_t& jump) {
+    riscv._jump(jump.target->name + 1);
 }
 
 void visit(const koopa_raw_store_t& store) {

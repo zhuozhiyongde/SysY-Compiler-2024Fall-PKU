@@ -23,3 +23,5 @@ void visit(const koopa_raw_load_t& load, const koopa_raw_value_t& value);
 void visit(const koopa_raw_store_t& store);
 void visit(const koopa_raw_return_t& ret);
 void visit(const koopa_raw_binary_t& binary, const koopa_raw_value_t& value);
+void visit(const koopa_raw_branch_t& branch);
+void visit(const koopa_raw_jump_t& jump);

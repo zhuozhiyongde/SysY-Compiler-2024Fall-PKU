@@ -296,3 +296,6 @@ Result StmtIfAST::print() const {
 现在对于符号的命名基于 symbol_table 的嵌套深度 `depth`，这会导致跨 Block 链的符号重名时，发生多个同名 `alloc` 指令，这是不合法的。
 
 想要解决这个问题，很简单，只需要维护一个全局的 `is_symbol_allocated` 即可，然后再 `store` 时，检查是否已经分配过，若已经分配过，则不分配，仅重新赋值。
+
+## Riscv
+

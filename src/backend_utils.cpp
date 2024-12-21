@@ -72,7 +72,7 @@ void Riscv::_lw(const string& rd, const string& base, const int& bias) {
     else {
         auto reg = register_manager.new_reg();
         _li(reg, bias);
-        riscv_ofs << "\tlw" << rd << ", " << reg << "(" << base << ")" << endl;
+        riscv_ofs << "\tlw " << rd << ", " << reg << "(" << base << ")" << endl;
     }
 }
 
@@ -84,7 +84,7 @@ void Riscv::_sw(const string& rs1, const string& base, const int& bias) {
     else {
         auto reg = register_manager.new_reg();
         _li(reg, bias);
-        riscv_ofs << "\tsw" << rs1 << ", " << reg << "(" << base << ")" << endl;
+        riscv_ofs << "\tsw " << rs1 << ", " << reg << "(" << base << ")" << endl;
     }
 }
 
@@ -97,6 +97,18 @@ void Riscv::_add_sp(const int& bias) {
         _li(reg, bias);
         riscv_ofs << "\tadd sp, sp, " << reg << endl;
     }
+}
+
+void Riscv::_bnez(const string& cond, const string& label) {
+    riscv_ofs << "\tbnez " << cond << ", " << label << endl;
+}
+
+void Riscv::_beqz(const string& cond, const string& label) {
+    riscv_ofs << "\tbeqz " << cond << ", " << label << endl;
+}
+
+void Riscv::_jump(const string& label) {
+    riscv_ofs << "\tj " << label << endl;
 }
 
 void Context::push(const koopa_raw_value_t& value, int bias) {

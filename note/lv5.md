@@ -99,3 +99,7 @@ string SymbolTable::assign(const string& ident) {
 ## Riscv
 
 没有修改。
+
+## Debug
+
+Lv5 存在标号块最后一条语句的问题，请参阅 `Lv6 - Koopa` 中的修复。

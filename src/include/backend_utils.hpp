@@ -12,8 +12,12 @@ using namespace std;
 class Riscv {
 public:
     void _ret();
+    // 单目运算
     void _seqz(const string& rd, const string& rs1);
     void _snez(const string& rd, const string& rs1);
+    void _li(const string& rd, const int& imm);
+    void _mv(const string& rd, const string& rs1);
+    // 双目运算
     void _or(const string& rd, const string& rs1, const string& rs2);
     void _and(const string& rd, const string& rs1, const string& rs2);
     void _xor(const string& rd, const string& rs1, const string& rs2);
@@ -25,11 +29,15 @@ public:
     void _rem(const string& rd, const string& rs1, const string& rs2);
     void _sgt(const string& rd, const string& rs1, const string& rs2);
     void _slt(const string& rd, const string& rs1, const string& rs2);
-    void _li(const string& rd, const int& imm);
-    void _mv(const string& rd, const string& rs1);
+    // 访存
     void _lw(const string& rd, const string& base, const int& bias);
     void _sw(const string& rs1, const string& base, const int& bias);
+    // 栈操作
     void _add_sp(const int& bias);
+    // 分支
+    void _bnez(const string& cond, const string& label);
+    void _beqz(const string& cond, const string& label);
+    void _jump(const string& label);
 };
 
 class Context {
