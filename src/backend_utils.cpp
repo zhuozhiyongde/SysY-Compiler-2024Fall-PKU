@@ -72,7 +72,8 @@ void Riscv::_lw(const string& rd, const string& base, const int& bias) {
     else {
         auto reg = register_manager.new_reg();
         _li(reg, bias);
-        riscv_ofs << "\tlw " << rd << ", " << reg << "(" << base << ")" << endl;
+        _add(reg, base, reg);
+        riscv_ofs << "\tlw " << rd << ", " << "(" << reg << ")" << endl;
     }
 }
 
@@ -84,7 +85,8 @@ void Riscv::_sw(const string& rs1, const string& base, const int& bias) {
     else {
         auto reg = register_manager.new_reg();
         _li(reg, bias);
-        riscv_ofs << "\tsw " << rs1 << ", " << reg << "(" << base << ")" << endl;
+        _add(reg, base, reg);
+        riscv_ofs << "\tsw " << rs1 << ", " << "(" << reg << ")" << endl;
     }
 }
 

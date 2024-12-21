@@ -60,11 +60,13 @@ void visit(const koopa_raw_function_t& func) {
     cnt *= 4;
     // 对齐到 16 的倍数
     cnt = (cnt + 15) / 16 * 16;
+    // 检查是否超过 imm12 的限制
+    cnt = 8000;
     context_manager.create(func->name + 1, cnt);
     context = context_manager.get(func->name + 1);
     riscv._add_sp(-cnt);
     // 检查是否超过 imm12 的限制
-    // context.stack_used = 4000;
+    context.stack_used = 2040;
     visit(func->bbs);
 };
 void visit(const koopa_raw_basic_block_t& bb) {
@@ -76,6 +78,7 @@ void visit(const koopa_raw_value_t& value) {
     // 根据指令类型判断后续需要如何访问
     const auto& kind = value->kind;
     // RVT: Raw Value Tag, 区分指令类型
+    register_manager.reset();
     switch (kind.tag) {
     case KOOPA_RVT_RETURN:
         // 访问 return 指令
@@ -115,17 +118,19 @@ void visit(const koopa_raw_value_t& value) {
 
 void visit(const koopa_raw_branch_t& branch) {
     // 访问 branch 指令
-    register_manager.reset();
     register_manager.get_operand_reg(branch.cond);
     auto cond = register_manager.reg_map[branch.cond];
     riscv._bnez(cond, branch.true_bb->name + 1);
     riscv._beqz(cond, branch.false_bb->name + 1);
 }
 
+void visit(const koopa_raw_jump_t& jump) {
+    riscv._jump(jump.target->name + 1);
+}
+
 void visit(const koopa_raw_load_t& load, const koopa_raw_value_t& value) {
-    register_manager.reset();
     // 取一个临时的寄存器，不修改 reg_count
-    auto reg = register_manager.cur_reg();
+    auto reg = register_manager.new_reg();
     auto bias = context.stack_used;
     riscv._lw(reg, "sp", context.stack_map[load.src]);
     context.push(value, bias);
@@ -133,12 +138,7 @@ void visit(const koopa_raw_load_t& load, const koopa_raw_value_t& value) {
     riscv._sw(reg, "sp", bias);
 }
 
-void visit(const koopa_raw_jump_t& jump) {
-    riscv._jump(jump.target->name + 1);
-}
-
 void visit(const koopa_raw_store_t& store) {
-    register_manager.reset();
     register_manager.get_operand_reg(store.value);
     // 如果 dest 不在 stack_map 中，则需要分配新的空间
     if (context.stack_map.find(store.dest) == context.stack_map.end()) {
@@ -169,7 +169,6 @@ void visit(const koopa_raw_return_t& ret) {
     riscv._ret();
 };
 void visit(const koopa_raw_binary_t& binary, const koopa_raw_value_t& value) {
-    register_manager.reset();
     // 访问 binary 指令
     bool lhs_use_reg = register_manager.get_operand_reg(binary.lhs);
     bool rhs_use_reg = register_manager.get_operand_reg(binary.rhs);
