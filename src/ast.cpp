@@ -3,6 +3,7 @@
 int TEMP_COUNT = 0;
 SymbolTable global_symbol_table;
 SymbolTable* local_symbol_table = &global_symbol_table;
+FrontendContextManager frontend_context_manager;
 
 Result CompUnitAST::print() const {
   return func_def->print();
@@ -27,8 +28,9 @@ Result BlockAST::print() const {
   SymbolTable* parent_symbol_table = local_symbol_table;
   local_symbol_table = new SymbolTable();
   local_symbol_table->set_parent(parent_symbol_table);
+
   for (auto& item : block_items) {
-    if (!local_symbol_table->get_returned()) {
+    if (!local_symbol_table->is_returned) {
       item->print();
     }
   }
@@ -70,12 +72,18 @@ Result VarDefAST::print() const {
   string ident_with_suffix = local_symbol_table->assign(ident);
   if (value) {
     Result value_result = (*value)->print();
-    koopa_ofs << "\t@" << ident_with_suffix << " = alloc i32" << endl;
+    if (!frontend_context_manager.is_symbol_allocated[ident_with_suffix]) {
+      koopa_ofs << "\t@" << ident_with_suffix << " = alloc i32" << endl;
+      frontend_context_manager.is_symbol_allocated[ident_with_suffix] = true;
+    }
     koopa_ofs << "\tstore " << value_result << ", @" << ident_with_suffix << endl;
     local_symbol_table->create(ident_with_suffix, VAR_);
   }
   else {
-    koopa_ofs << "\t@" << ident_with_suffix << " = alloc i32" << endl;
+    if (!frontend_context_manager.is_symbol_allocated[ident_with_suffix]) {
+      koopa_ofs << "\t@" << ident_with_suffix << " = alloc i32" << endl;
+      frontend_context_manager.is_symbol_allocated[ident_with_suffix] = true;
+    }
     local_symbol_table->create(ident_with_suffix, VAR_);
   }
   return Result();
@@ -83,6 +91,67 @@ Result VarDefAST::print() const {
 
 Result InitValAST::print() const {
   return exp->print();
+}
+
+Result StmtIfAST::print() const {
+  Result exp_result = exp->print();
+  SymbolTable* parent_symbol_table = local_symbol_table;
+
+  string then_label = frontend_context_manager.get_then_label();
+  string else_label = frontend_context_manager.get_else_label();
+  string end_label = frontend_context_manager.get_end_label();
+  frontend_context_manager.add_if_else_count();
+
+  if (else_stmt) {
+    koopa_ofs << "\tbr " << exp_result << ", " << then_label << ", " << else_label << endl;
+  }
+  else {
+    koopa_ofs << "\tbr " << exp_result << ", " << then_label << ", " << end_label << endl;
+  }
+  koopa_ofs << then_label << ":" << endl;
+
+  // 先判断 then 语句是否是一个 StmtBlockAST，若不是，则需要新开一个符号表
+  if (typeid(*then_stmt) == typeid(StmtBlockAST)) {
+    then_stmt->print();
+    if (!local_symbol_table->is_child_returned) {
+      koopa_ofs << "\tjump " << end_label << endl;
+    }
+  }
+  else {
+    local_symbol_table = new SymbolTable();
+    local_symbol_table->set_parent(parent_symbol_table);
+    then_stmt->print();
+    if (!local_symbol_table->is_returned) {
+      koopa_ofs << "\tjump " << end_label << endl;
+    }
+    delete local_symbol_table;
+    local_symbol_table = parent_symbol_table;
+  }
+
+  local_symbol_table->is_child_returned = false;
+
+  if (else_stmt) {
+    koopa_ofs << else_label << ":" << endl;
+    // 同上，if 的 else 语句也必须默认新开一个符号表
+    if (typeid(**else_stmt) == typeid(StmtBlockAST)) {
+      (*else_stmt)->print();
+      if (!local_symbol_table->is_child_returned) {
+        koopa_ofs << "\tjump " << end_label << endl;
+      }
+    }
+    else {
+      local_symbol_table = new SymbolTable();
+      local_symbol_table->set_parent(parent_symbol_table);
+      (*else_stmt)->print();
+      if (!local_symbol_table->is_returned) {
+        koopa_ofs << "\tjump " << end_label << endl;
+      }
+      delete local_symbol_table;
+      local_symbol_table = parent_symbol_table;
+    }
+  }
+  koopa_ofs << end_label << ":" << endl;
+  return Result();
 }
 
 Result StmtAssignAST::print() const {
@@ -113,7 +182,8 @@ Result StmtReturnAST::print() const {
   else {
     koopa_ofs << "\tret" << endl;
   }
-  local_symbol_table->set_returned(true);
+  local_symbol_table->is_returned = true;
+  local_symbol_table->parent->is_child_returned = true;
   return Result();
 }
 

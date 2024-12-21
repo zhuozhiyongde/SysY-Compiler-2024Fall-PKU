@@ -1,4 +1,4 @@
-#include "include/type.hpp"
+#include "include/frontend_utils.hpp"
 
 void SymbolTable::create(const string& ident, Symbol symbol) {
     // 保证当前层级不存在
@@ -35,10 +35,6 @@ void SymbolTable::set_parent(SymbolTable* parent) {
     this->depth = parent->depth + 1;
 }
 
-void SymbolTable::set_depth(int depth) {
-    this->depth = depth;
-}
-
 string SymbolTable::locate(const string& ident) {
     string ident_with_suffix = ident + "_" + to_string(depth);
     if (symbol_table.find(ident_with_suffix) == symbol_table.end() && parent) {
@@ -51,10 +47,18 @@ string SymbolTable::assign(const string& ident) {
     return ident + "_" + to_string(depth);
 }
 
-void SymbolTable::set_returned(bool is_returned) {
-    this->is_returned = is_returned;
+string FrontendContextManager::get_then_label() {
+    return "%then_" + to_string(if_else_count);
 }
 
-bool SymbolTable::get_returned() {
-    return this->is_returned;
+string FrontendContextManager::get_else_label() {
+    return "%else_" + to_string(if_else_count);
+}
+
+string FrontendContextManager::get_end_label() {
+    return "%end_" + to_string(if_else_count);
+}
+
+void FrontendContextManager::add_if_else_count() {
+    if_else_count++;
 }

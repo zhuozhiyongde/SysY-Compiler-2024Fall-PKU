@@ -8,7 +8,8 @@
 #include <vector>
 #include <unordered_map>
 #include <cassert>
-#include "include/type.hpp"
+#include <typeinfo>
+#include "include/frontend_utils.hpp"
 
 using namespace std;
 
@@ -94,6 +95,14 @@ public:
 class InitValAST : public BaseAST {
 public:
     unique_ptr<BaseAST> exp;
+    Result print() const override;
+};
+
+class StmtIfAST : public BaseAST {
+public:
+    unique_ptr<BaseAST> exp;
+    unique_ptr<BaseAST> then_stmt;
+    optional<unique_ptr<BaseAST>> else_stmt;
     Result print() const override;
 };
 

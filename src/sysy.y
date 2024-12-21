@@ -40,7 +40,7 @@ using namespace std;
 
 // lexer 返回的所有 token 种类的声明
 // 注意 IDENT 和 INT_CONST 会返回 token 的值, 分别对应 str_val 和 int_val
-%token INT CONST RETURN
+%token INT CONST RETURN IF ELSE
 %token <str_val> IDENT
 %token <str_val> EqOp RelOp AddOp NotOp MulOp AndOp OrOp
 %token <int_val> INT_CONST
@@ -49,7 +49,7 @@ using namespace std;
 // 按照给定语法规范排序
 %type <ast_val> CompUnit Decl ConstDecl ConstDef ConstInitVal VarDecl VarDef InitVal
 %type <ast_val> FuncDef FuncType
-%type <ast_val> Block BlockItem Stmt
+%type <ast_val> Block BlockItem Stmt MatchedStmt OpenStmt
 %type <ast_val> ConstExp Exp LVal PrimaryExp UnaryExp MulExp AddExp RelExp EqExp LOrExp LAndExp
 
 %type <vec_val> ExtendBlockItem ExtendConstDef ExtendVarDef
@@ -243,7 +243,23 @@ InitVal
   ;
 
 Stmt
-  : LVal '=' Exp ';' {
+  : MatchedStmt {
+    $$ = $1;
+  }
+  | OpenStmt {
+    $$ = $1;
+  }
+  ;
+
+MatchedStmt
+  : IF '(' Exp ')' MatchedStmt ELSE MatchedStmt {
+    auto ast = new StmtIfAST();
+    ast->exp = unique_ptr<BaseAST>($3);
+    ast->then_stmt = unique_ptr<BaseAST>($5);
+    ast->else_stmt = unique_ptr<BaseAST>($7);
+    $$ = ast;
+  }
+  | LVal '=' Exp ';' {
     auto ast = new StmtAssignAST();
     ast->l_val = unique_ptr<BaseAST>($1);
     ast->exp = unique_ptr<BaseAST>($3);
@@ -270,6 +286,22 @@ Stmt
   }
   | RETURN ';' {
     auto ast = new StmtReturnAST();
+    $$ = ast;
+  }
+  ;
+
+OpenStmt
+  : IF '(' Exp ')' Stmt {
+    auto ast = new StmtIfAST();
+    ast->exp = unique_ptr<BaseAST>($3);
+    ast->then_stmt = unique_ptr<BaseAST>($5);
+    $$ = ast;
+  }
+  | IF '(' Exp ')' MatchedStmt ELSE OpenStmt {
+    auto ast = new StmtIfAST();
+    ast->exp = unique_ptr<BaseAST>($3);
+    ast->then_stmt = unique_ptr<BaseAST>($5);
+    ast->else_stmt = unique_ptr<BaseAST>($7);
     $$ = ast;
   }
   ;

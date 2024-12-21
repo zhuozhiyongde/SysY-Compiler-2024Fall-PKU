@@ -1,4 +1,4 @@
-#include "include/helper.hpp"
+#include "include/backend_utils.hpp"
 
 void Riscv::_ret() {
     riscv_ofs << "\tret" << endl;
@@ -71,7 +71,7 @@ void Riscv::_lw(const string& rd, const string& base, const int& bias) {
     }
     else {
         auto reg = register_manager.new_reg();
-        riscv._li(reg, bias);
+        _li(reg, bias);
         riscv_ofs << "\tlw" << rd << ", " << reg << "(" << base << ")" << endl;
     }
 }
@@ -83,7 +83,7 @@ void Riscv::_sw(const string& rs1, const string& base, const int& bias) {
     }
     else {
         auto reg = register_manager.new_reg();
-        riscv._li(reg, bias);
+        _li(reg, bias);
         riscv_ofs << "\tsw" << rs1 << ", " << reg << "(" << base << ")" << endl;
     }
 }
@@ -94,7 +94,7 @@ void Riscv::_add_sp(const int& bias) {
     }
     else {
         auto reg = register_manager.new_reg();
-        riscv._li(reg, bias);
+        _li(reg, bias);
         riscv_ofs << "\tadd sp, sp, " << reg << endl;
     }
 }
