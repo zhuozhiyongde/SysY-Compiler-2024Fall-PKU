@@ -124,12 +124,16 @@ public:
 
 有两种做法：
 
-1. 在 `class SymbolTable` 中，添加一个 `is_child_returned` 表示子符号表是否已经返回。在 `ast.cpp` 中，使用 `typeid` 判断 `stmt` 是否为 `StmtBlockAST`，若是，则不必额外创建符号表，若否，则创建符号表，并设置 `parent` 关系。注意，若选用此做法，你需要在 `if` 语句处理 `then` 和 `else` 之间，重置 `is_child_returned` 为 `false`。
-2. 在 `sysy.y` 中，直接对于 `MatchedStmt` 创建一个 `BlockAST`，移除 ` StmtBlockAST`，然后：
+1. 在 `class SymbolTable` 中，添加一个 `is_child_returned` 表示子符号表是否已经返回。在 `ast.cpp` 中，使用 `typeid` 判断 `stmt` 是否为 `BlockAST`，若是，则不必额外创建符号表，若否，则创建符号表，并设置 `parent` 关系。注意，若选用此做法，你需要在 `if` 语句处理 `then` 和 `else` 之间，重置 `is_child_returned` 为 `false`。
+2. 在 `sysy.y` 中，直接对于 `MatchedStmt` 创建一个 `BlockAST`，然后：
   1. 对于非 `Block` 的推导，在其 `block_items` 中添加单一的语句。
   2. 对于 `Block` 的推导，直接返回。
 
-我这里暂时选用的是第一种做法，可能稍后会重构为第二种，因为第一种还依赖于 `typeid`，感觉比较烦。
+~~我这里暂时选用的是第一种做法，可能稍后会重构为第二种，因为第一种还依赖于 `typeid`，感觉比较烦。~~
+
+经测试，第二种用不了，因为 MatchedStmt 嵌套时会导致一次增加两层符号表，但是我们在上层最多获取下一层的符号表，这就会导致我们无法判断 `jump` 的时机。
+
+所以除非必要，还是别添加额外的符号表层次吧。
 
 ### 跨 Block 链符号重名
 
@@ -137,3 +141,32 @@ public:
 
 想要解决这个问题，很简单，只需要维护一个全局的 `is_symbol_allocated` 即可，然后再 `store` 时，检查是否已经分配过，若已经分配过，则不分配，仅重新赋值。
 
+### 全局返回时的 return 指令
+
+由于 if else 语句引入了标号，我们需要特别考虑其位于整个函数块最后的时候，会额外生成一个 `%end` 标号，但此时没有下一条语句了。
+
+这里其实是 lv5 的 bug，当函数顶层 Block 到末尾都没有返回指令时，需要添加 `ret` 指令。
+
+只需要在 `BlockAST` 中特判当前是否为整个函数块顶层，然后根据结果决定是否添加 `ret` 指令即可。
+
+```cpp
+// src/ast.cpp
+Result BlockAST::print() const {
+  SymbolTable* parent_symbol_table = local_symbol_table;
+  local_symbol_table = new SymbolTable();
+  local_symbol_table->set_parent(parent_symbol_table);
+  for (auto& item : block_items) {
+    if (!local_symbol_table->is_returned) {
+      item->print();
+    }
+  }
+  if (local_symbol_table->depth == 1) {
+    if (!local_symbol_table->is_returned) {
+      koopa_ofs << "\tret 0" << endl;
+    }
+  }
+  delete local_symbol_table;
+  local_symbol_table = parent_symbol_table;
+  return Result();
+}
+```

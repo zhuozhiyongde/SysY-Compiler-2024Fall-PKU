@@ -125,12 +125,6 @@ public:
     Result print() const override;
 };
 
-class StmtBlockAST : public BaseAST {
-public:
-    unique_ptr<BaseAST> block;
-    Result print() const override;
-};
-
 class LValAST : public BaseAST {
 public:
     string ident;

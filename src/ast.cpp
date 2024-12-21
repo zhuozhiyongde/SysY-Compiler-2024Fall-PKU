@@ -15,6 +15,7 @@ Result FuncDefAST::print() const {
   koopa_ofs << " {" << endl;
   koopa_ofs << "%entry:" << endl;
   block->print();
+  koopa_ofs << "\tret 0" << endl;
   koopa_ofs << "}" << endl;
   return Result();
 }
@@ -28,7 +29,6 @@ Result BlockAST::print() const {
   SymbolTable* parent_symbol_table = local_symbol_table;
   local_symbol_table = new SymbolTable();
   local_symbol_table->set_parent(parent_symbol_table);
-
   for (auto& item : block_items) {
     if (!local_symbol_table->is_returned) {
       item->print();
@@ -104,51 +104,18 @@ Result StmtIfAST::print() const {
 
   if (else_stmt) {
     koopa_ofs << "\tbr " << exp_result << ", " << then_label << ", " << else_label << endl;
+    koopa_ofs << then_label << ":" << endl;
+    then_stmt->print();
+    koopa_ofs << "\tjump " << end_label << endl;
+    koopa_ofs << else_label << ":" << endl;
+    (*else_stmt)->print();
+    koopa_ofs << "\tjump " << end_label << endl;
   }
   else {
     koopa_ofs << "\tbr " << exp_result << ", " << then_label << ", " << end_label << endl;
-  }
-  koopa_ofs << then_label << ":" << endl;
-
-  // 先判断 then 语句是否是一个 StmtBlockAST，若不是，则需要新开一个符号表
-  if (typeid(*then_stmt) == typeid(StmtBlockAST)) {
+    koopa_ofs << then_label << ":" << endl;
     then_stmt->print();
-    if (!local_symbol_table->is_child_returned) {
-      koopa_ofs << "\tjump " << end_label << endl;
-    }
-  }
-  else {
-    local_symbol_table = new SymbolTable();
-    local_symbol_table->set_parent(parent_symbol_table);
-    then_stmt->print();
-    if (!local_symbol_table->is_returned) {
-      koopa_ofs << "\tjump " << end_label << endl;
-    }
-    delete local_symbol_table;
-    local_symbol_table = parent_symbol_table;
-  }
-
-  local_symbol_table->is_child_returned = false;
-
-  if (else_stmt) {
-    koopa_ofs << else_label << ":" << endl;
-    // 同上，if 的 else 语句也必须默认新开一个符号表
-    if (typeid(**else_stmt) == typeid(StmtBlockAST)) {
-      (*else_stmt)->print();
-      if (!local_symbol_table->is_child_returned) {
-        koopa_ofs << "\tjump " << end_label << endl;
-      }
-    }
-    else {
-      local_symbol_table = new SymbolTable();
-      local_symbol_table->set_parent(parent_symbol_table);
-      (*else_stmt)->print();
-      if (!local_symbol_table->is_returned) {
-        koopa_ofs << "\tjump " << end_label << endl;
-      }
-      delete local_symbol_table;
-      local_symbol_table = parent_symbol_table;
-    }
+    koopa_ofs << "\tjump " << end_label << endl;
   }
   koopa_ofs << end_label << ":" << endl;
   return Result();
@@ -170,20 +137,18 @@ Result StmtExpAST::print() const {
   return Result();
 }
 
-Result StmtBlockAST::print() const {
-  return block->print();
-}
-
 Result StmtReturnAST::print() const {
   if (exp) {
     Result exp_result = (*exp)->print();
     koopa_ofs << "\tret " << exp_result << endl;
   }
   else {
-    koopa_ofs << "\tret" << endl;
+    koopa_ofs << "\tret 0" << endl;
   }
   local_symbol_table->is_returned = true;
-  local_symbol_table->parent->is_child_returned = true;
+  auto ret_end_label = frontend_context_manager.get_ret_end_label();
+  frontend_context_manager.add_ret_count();
+  koopa_ofs << ret_end_label << ":" << endl;
   return Result();
 }
 

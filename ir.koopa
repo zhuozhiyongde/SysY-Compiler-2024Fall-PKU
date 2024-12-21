@@ -112,4 +112,6 @@ fun @main(): i32 {
 	%76 = load @sum_1
 	%77 = mod %76, 77
 	ret %77
+%return_end_0:
+	ret 0
 }

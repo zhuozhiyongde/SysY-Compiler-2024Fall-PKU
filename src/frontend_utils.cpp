@@ -59,6 +59,14 @@ string FrontendContextManager::get_end_label() {
     return "%end_" + to_string(if_else_count);
 }
 
+string FrontendContextManager::get_ret_end_label() {
+    return "%return_end_" + to_string(ret_count);
+}
+
 void FrontendContextManager::add_if_else_count() {
     if_else_count++;
+}
+
+void FrontendContextManager::add_ret_count() {
+    ret_count++;
 }

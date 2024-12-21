@@ -32,7 +32,6 @@ private:
 public:
     int depth = 0;
     bool is_returned = false;
-    bool is_child_returned = false;
     SymbolTable* parent = nullptr;
 
     void create(const string& ident, Symbol symbol);
@@ -67,10 +66,13 @@ public:
 class FrontendContextManager {
 private:
     int if_else_count = 0;
+    int ret_count = 0;
 public:
     unordered_map<string, bool> is_symbol_allocated;
     string get_then_label();
     string get_else_label();
     string get_end_label();
+    string get_ret_end_label();
     void add_if_else_count();
+    void add_ret_count();
 };
