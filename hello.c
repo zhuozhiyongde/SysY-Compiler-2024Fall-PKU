@@ -1,4 +1,8 @@
 int main() {
-  return 0;
-  return 1;
+  int x = 8192;
+  int y = 123;
+  int z = 234;
+  return x + y + z;
 }
+
+

@@ -62,7 +62,7 @@ void visit(const koopa_raw_function_t& func) {
     cnt = (cnt + 15) / 16 * 16;
     context_manager.create(func->name + 1, cnt);
     context = context_manager.get(func->name + 1);
-    riscv._addi("sp", "sp", -cnt);
+    riscv._add_sp(-cnt);
     visit(func->bbs);
 };
 void visit(const koopa_raw_basic_block_t& bb) {
@@ -107,10 +107,10 @@ void visit(const koopa_raw_load_t& load, const koopa_raw_value_t& value) {
     // 取一个临时的寄存器，不修改 reg_count
     auto reg = register_manager.cur_reg();
     auto bias = context.stack_used;
-    riscv._lw(reg, context.stack_map[load.src]);
+    riscv._lw(reg, "sp", context.stack_map[load.src]);
     context.push(value, bias);
     context.stack_used += 4;
-    riscv._sw(reg, to_string(bias) + "(sp)");
+    riscv._sw(reg, "sp", bias);
 }
 
 void visit(const koopa_raw_store_t& store) {
@@ -118,10 +118,10 @@ void visit(const koopa_raw_store_t& store) {
     register_manager.get_operand_reg(store.value);
     // 如果 dest 不在 stack_map 中，则需要分配新的空间
     if (context.stack_map.find(store.dest) == context.stack_map.end()) {
-        context.stack_map[store.dest] = to_string(context.stack_used) + "(sp)";
+        context.stack_map[store.dest] = context.stack_used;
         context.stack_used += 4;
     }
-    riscv._sw(register_manager.reg_map[store.value], context.stack_map[store.dest]);
+    riscv._sw(register_manager.reg_map[store.value], "sp", context.stack_map[store.dest]);
 }
 
 void visit(const koopa_raw_return_t& ret) {
@@ -131,20 +131,21 @@ void visit(const koopa_raw_return_t& ret) {
     }
     // 形如 ret exp, 返回表达式的值
     else if (ret.value->kind.tag == KOOPA_RVT_BINARY) {
-        riscv._lw("a0", context.stack_map[ret.value]);
+        riscv._lw("a0", "sp", context.stack_map[ret.value]);
         // 或者使用 mv 指令，将寄存器中的值赋值给 a0
         // riscv._mv("a0", register_manager.reg_map[ret.value]);
     }
     else if (ret.value->kind.tag == KOOPA_RVT_LOAD) {
-        riscv._lw("a0", context.stack_map[ret.value]);
+        riscv._lw("a0", "sp", context.stack_map[ret.value]);
     }
     else {
         riscv._li("a0", 0);
     }
-    riscv._addi("sp", "sp", context.stack_size);
+    riscv._add_sp(context.stack_size);
     riscv._ret();
 };
 void visit(const koopa_raw_binary_t& binary, const koopa_raw_value_t& value) {
+    register_manager.reset();
     // 访问 binary 指令
     bool lhs_use_reg = register_manager.get_operand_reg(binary.lhs);
     bool rhs_use_reg = register_manager.get_operand_reg(binary.rhs);
@@ -216,7 +217,7 @@ void visit(const koopa_raw_binary_t& binary, const koopa_raw_value_t& value) {
         riscv_ofs << "Invalid binary operation: " << koopaRawBinaryOpToString(binary.op) << endl;
     }
     // 把结果存回栈中
-    context.stack_map[value] = to_string(context.stack_used) + "(sp)";
-    riscv._sw(cur, context.stack_map[value]);
+    context.stack_map[value] = context.stack_used;
+    riscv._sw(cur, "sp", context.stack_map[value]);
     context.stack_used += 4;
 }

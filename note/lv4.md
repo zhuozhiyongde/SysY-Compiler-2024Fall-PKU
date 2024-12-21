@@ -214,3 +214,13 @@ else if (ret.value->kind.tag == KOOPA_RVT_LOAD) {
     riscv._lw("a0", context.stack_map[ret.value]);
 }
 ```
+
+## Debug
+
+发现在实现中忽略了对于立即数偏置的 12 位立即数限制。由于存在交叉引用，遂重构了 `include/helper.hpp`，将实现移动到了 `helper.cpp` 中。
+
+对于 `_sw`、`_lw` 指令，需要检查偏移量是否在 12 位立即数范围内，否则需要使用寄存器来存储偏移量。
+
+新增 `_add_sp` 指令，用于在修改栈指针前预检立即数是否在 12 位立即数范围内，若不在，则使用寄存器来存储偏移量。
+
+又又发现过不去 `21_decl_after_decl3` 测试点，遂检查了一下代码，发现是不能仅仅只在 `load` 、 `store` 指令中重置寄存器计数，对于 `binary` 指令，也需要重置寄存器计数。
