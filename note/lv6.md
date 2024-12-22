@@ -164,7 +164,6 @@ Result StmtIfAST::print() const {
 
 ### 处理作用域
 
-
 考虑一个 `if(0) return 2; return 3;` 的测试点。
 
 如果不给 `MatchedStmt` 新开符号表，那么会导致 `return 2` 影响掉当前符号表的 `is_returned`，从而导致 `return 3` 被跳过。
