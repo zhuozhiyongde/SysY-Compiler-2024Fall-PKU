@@ -9,6 +9,11 @@
 
 using namespace std;
 
+/**
+ * @brief Riscv 类，用于生成 Riscv 汇编代码
+ * @note - 包含 Riscv 汇编代码的生成方法
+ * @note - 会自动处理偏置量，使之不超过 12 位限制
+ */
 class Riscv {
 public:
     void _ret();
@@ -40,6 +45,12 @@ public:
     void _jump(const string& label);
 };
 
+/**
+ * @brief Context 类，用于管理栈空间
+ * @note - stack_size：栈空间大小
+ * @note - stack_used：栈空间已使用大小
+ * @note - stack_map：栈空间映射，用于管理栈空间的使用情况
+ */
 class Context {
 public:
     int stack_size;
@@ -50,6 +61,10 @@ public:
     void push(const koopa_raw_value_t& value, int bias);
 };
 
+/**
+ * @brief ContextManager 类，用于管理 Context
+ * @note - context_map：Context 映射，用于管理 Context 的使用情况
+ */
 class ContextManager {
 public:
     unordered_map<string, Context> context_map;
@@ -57,6 +72,11 @@ public:
     Context& get(const string& name);
 };
 
+/**
+ * @brief RegisterManager 类，用于管理寄存器
+ * @note - reg_count：寄存器计数器
+ * @note - reg_map：寄存器映射，用于管理指令到寄存器的映射。
+ */
 class RegisterManager {
 private:
     // 寄存器计数器

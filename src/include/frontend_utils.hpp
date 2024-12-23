@@ -13,8 +13,8 @@ using namespace std;
 
 /**
  * @brief 符号类，表示变量或常量
- * @note - 包含符号的类型（type，变量 VAR / 常量 VAL）
- * @note - 包含符号的值（value）
+ * @note - type：符号的类型，变量 VAR / 常量 VAL
+ * @note - value：符号的值
  */
 class Symbol {
 public:
@@ -33,9 +33,9 @@ public:
 
 /**
  * @brief 符号表类，管理变量名和符号，实现为单向链表
- * @note - 包含符号表的深度（depth）
- * @note - 包含符号表是否已经存在 return 语句（is_returned），用于判断是否需要生成后续语句
- * @note - 包含符号表的父符号表（parent）
+ * @note - depth：包含符号表的深度
+ * @note - is_returned：包含符号表是否已经存在 return 语句，用于判断是否需要生成后续语句
+ * @note - parent：包含符号表的父符号表
  */
 class SymbolTable {
 private:
@@ -57,8 +57,8 @@ public:
 
 /**
  * @brief 结果类，表示前端生成的指令的结果
- * @note - 包含结果的类型（type，常量 IMM / 寄存器 REG）
- * @note - 包含结果的值（value）
+ * @note - type：结果的类型，常量 IMM / 寄存器 REG
+ * @note - value：结果的值
  */
 class Result {
 public:
@@ -81,10 +81,10 @@ public:
 
 /**
  * @brief 前端上下文管理器，管理横跨 block 的局部信息
- * @note - 管理是否已经存在过分配某变量的指令，避免重复 alloc
- * @note - 管理 if-else 语句的计数，用于生成 if-else 语句的标签
- * @note - 管理 return 语句的计数，用于生成 return 语句的标签
- * @note - 管理临时变量的分配
+ * @note - is_symbol_allocated：是否已经存在过分配某变量的指令，避免重复 alloc
+ * @note - if_else_count：if-else 语句的计数，用于生成 if-else 语句的标签
+ * @note - ret_count：return 语句的计数，用于生成 return 语句的标签
+ * @note - temp_count：临时变量分配计数
  */
 class FrontendContextManager {
 private:
