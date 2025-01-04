@@ -122,4 +122,22 @@ Result LExpWithOpAST::print() const {
 同时，对于其结果，我们不能使用类似 `%num` 这样的寄存器来存储，而必须存储在 `@short_result_0` 这样的变量中（且需要先使用 `alloc` 分配），因为我们在运行的时候并不可知其结果，根据 `br` 的跳转与否，我们可能会发生类似 ICS 课程中的 `cmov` 指令，而传统的寄存器是不支持多次赋值的。
 
 
-### 
+### while 语句
+
+while 语句的处理需要实现三个标签：
+
+- `%while_entry`：while 语句的入口标签
+- `%while_body`：while 语句的循环体标签
+- `%while_end`：while 语句的结束标签
+
+这三个标签都会作为跳转语句的目标。
+
+我们还需要为 while 循环维护两个计数器：
+
+- `while_count`：while 语句计数，用于生成 label
+- `while_current`：当前正在处理的 while 语句标号，用于控制 break/continue 的目的地
+
+值得注意的是，如果你的 if 语句实现的比较成熟，那么 while 语句的实现将会非常简单，几乎没有什么坑点，除了：
+
+1. 由于你不知道 while 语句是不是某一标签后第一个语句，所以你需要在 while 语句的开始处生成一个 `jump` 指令，跳转到 while 语句的入口标签。
+2. 在 break/continue 语句中，你应当有形如 ret 语句的处理，使得最后一条语句变为标签而不是跳转指令。在我的实现中，我合并了 ret/break/continue 的语句计数，统一改为 jump_count。
