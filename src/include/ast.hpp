@@ -106,6 +106,23 @@ public:
     Result print() const override;
 };
 
+class StmtWhileAST : public BaseAST {
+public:
+    unique_ptr<BaseAST> exp;
+    unique_ptr<BaseAST> stmt;
+    Result print() const override;
+};
+
+class StmtBreakAST : public BaseAST {
+public:
+    Result print() const override;
+};
+
+class StmtContinueAST : public BaseAST {
+public:
+    Result print() const override;
+};
+
 class StmtAssignAST : public BaseAST {
 public:
     unique_ptr<BaseAST> l_val;

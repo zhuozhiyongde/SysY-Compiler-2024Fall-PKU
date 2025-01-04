@@ -128,6 +128,49 @@ Result StmtIfAST::print() const {
   return Result();
 }
 
+Result StmtWhileAST::print() const {
+  // 准备标签
+  string entry_label = environment_manager.get_while_entry_label();
+  string body_label = environment_manager.get_while_body_label();
+  string end_label = environment_manager.get_while_end_label();
+  auto old_while_current = environment_manager.get_while_current();
+  environment_manager.set_while_current(environment_manager.get_while_count());
+  environment_manager.add_while_count();
+
+  // 生成 while 循环
+  koopa_ofs << "\tjump " << entry_label << endl;
+  koopa_ofs << entry_label << ":" << endl;
+  Result exp_result = exp->print();
+  // 创建新的符号表，避免 while 语句中的单句 return 修改当前块 is_returned
+  SymbolTable* parent_symbol_table = local_symbol_table;
+  local_symbol_table = new SymbolTable();
+  local_symbol_table->set_parent(parent_symbol_table);
+  koopa_ofs << "\tbr " << exp_result << ", " << body_label << ", " << end_label << endl;
+  koopa_ofs << body_label << ":" << endl;
+  stmt->print();
+  koopa_ofs << "\tjump " << entry_label << endl;
+  koopa_ofs << end_label << ":" << endl;
+  // 恢复符号表
+  delete local_symbol_table;
+  local_symbol_table = parent_symbol_table;
+  environment_manager.set_while_current(old_while_current);
+  return Result();
+}
+
+Result StmtBreakAST::print() const {
+  koopa_ofs << "\tjump " << environment_manager.get_while_end_label(true) << endl;
+  auto jump_label = environment_manager.get_jump_label();
+  koopa_ofs << jump_label << ":" << endl;
+  return Result();
+}
+
+Result StmtContinueAST::print() const {
+  koopa_ofs << "\tjump " << environment_manager.get_while_entry_label(true) << endl;
+  auto jump_label = environment_manager.get_jump_label();
+  koopa_ofs << jump_label << ":" << endl;
+  return Result();
+}
+
 Result StmtAssignAST::print() const {
   // 获取变量名
   auto ident = ((LValAST*)l_val.get())->ident;
@@ -161,8 +204,8 @@ Result StmtReturnAST::print() const {
   // 设置当前块 is_returned 为 true
   local_symbol_table->is_returned = true;
   // 设置返回结束标签，这样可以避免一个标号末尾出现多句 ret / br / jump 的情况
-  auto ret_end_label = environment_manager.get_ret_end_label();
-  koopa_ofs << ret_end_label << ":" << endl;
+  auto jump_label = environment_manager.get_jump_label();
+  koopa_ofs << jump_label << ":" << endl;
   return Result();
 }
 
@@ -379,7 +422,7 @@ Result RelExpWithOpAST::print() const {
   }
   // 若左右表达式结果不均为常量，则使用临时变量计算结果
   else {
-    Result result = Result(Result::Type::REG, environment_manager.get_temp_count());
+    Result result = NEW_REG_;
     switch (rel_op) {
     case RelOp::LE:
       koopa_ofs << "\t" << result << " = le " << lhs << ", " << rhs << endl;
@@ -431,7 +474,7 @@ Result AddExpWithOpAST::print() const {
   }
   // 若左右表达式结果不均为常量，则使用临时变量计算结果
   else {
-    Result result = Result(Result::Type::REG, environment_manager.get_temp_count());
+    Result result = NEW_REG_;
     switch (add_op) {
     case AddOp::ADD:
       koopa_ofs << "\t" << result << " = add " << lhs << ", " << rhs << endl;
@@ -482,7 +525,7 @@ Result MulExpWithOpAST::print() const {
   }
   // 若左右表达式结果不均为常量，则使用临时变量计算结果
   else {
-    Result result = Result(Result::Type::REG, environment_manager.get_temp_count());
+    Result result = NEW_REG_;
     switch (mul_op) {
     case MulOp::MUL:
       koopa_ofs << "\t" << result << " = mul " << lhs << ", " << rhs << endl;

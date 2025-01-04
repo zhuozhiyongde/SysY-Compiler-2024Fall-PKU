@@ -17,6 +17,7 @@ FuncFParams   ::= FuncFParam {"," FuncFParam};
 FuncFParam    ::= BType IDENT ["[" "]" {"[" ConstExp "]"}];
 
 Block         ::= "{" {BlockItem} "}";
+"
 BlockItem     ::= Decl | Stmt;
 Stmt          ::= LVal "=" Exp ";"
                 | [Exp] ";"
