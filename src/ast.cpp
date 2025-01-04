@@ -2,7 +2,7 @@
 
 SymbolTable global_symbol_table;
 SymbolTable* local_symbol_table = &global_symbol_table;
-FrontendContextManager fcm;
+EnvironmentManager environment_manager;
 
 Result CompUnitAST::print() const {
   return func_def->print();
@@ -74,9 +74,9 @@ Result VarDefAST::print() const {
   // 在当前层级符号表中分配变量
   string ident_with_suffix = local_symbol_table->assign(ident);
   // 判断是否需要生成 alloc 指令
-  if (!fcm.is_symbol_allocated[ident_with_suffix]) {
+  if (!environment_manager.is_symbol_allocated[ident_with_suffix]) {
     koopa_ofs << "\t@" << ident_with_suffix << " = alloc i32" << endl;
-    fcm.is_symbol_allocated[ident_with_suffix] = true;
+    environment_manager.is_symbol_allocated[ident_with_suffix] = true;
   }
   // 若初始值不为空，则生成 store 指令
   if (value) {
@@ -100,10 +100,10 @@ Result StmtIfAST::print() const {
   local_symbol_table = new SymbolTable();
   local_symbol_table->set_parent(parent_symbol_table);
   // 准备标签
-  string then_label = fcm.get_then_label();
-  string else_label = fcm.get_else_label();
-  string end_label = fcm.get_end_label();
-  fcm.add_if_else_count();
+  string then_label = environment_manager.get_then_label();
+  string else_label = environment_manager.get_else_label();
+  string end_label = environment_manager.get_end_label();
+  environment_manager.add_if_else_count();
   // 根据是否存在 else 语句进行分支处理
   if (else_stmt) {
     koopa_ofs << "\tbr " << exp_result << ", " << then_label << ", " << else_label << endl;
@@ -161,7 +161,7 @@ Result StmtReturnAST::print() const {
   // 设置当前块 is_returned 为 true
   local_symbol_table->is_returned = true;
   // 设置返回结束标签，这样可以避免一个标号末尾出现多句 ret / br / jump 的情况
-  auto ret_end_label = fcm.get_ret_end_label();
+  auto ret_end_label = environment_manager.get_ret_end_label();
   koopa_ofs << ret_end_label << ":" << endl;
   return Result();
 }
@@ -173,7 +173,7 @@ Result LValAST::print() const {
   auto symbol = local_symbol_table->read(ident_with_suffix);
   // 若变量是变量，则使用 load 指令读取其值
   if (symbol.type == Symbol::Type::VAR) {
-    Result result = NEW_REG_(fcm);
+    Result result = NEW_REG_;
     koopa_ofs << "\t" << result << " = load @" << ident_with_suffix << endl;
     return result;
   }
@@ -221,15 +221,15 @@ Result LExpWithOpAST::print() const {
   }
   // 若左右表达式结果不均为常量，则使用临时变量计算结果
   else {
-    Result result = NEW_REG_(fcm);
+    Result result = NEW_REG_;
     if (logical_op == LogicalOp::LOGICAL_OR) {
-      Result temp = NEW_REG_(fcm);
+      Result temp = NEW_REG_;
       koopa_ofs << "\t" << temp << " = or " << lhs << ", " << rhs << endl;
       koopa_ofs << "\t" << result << " = ne " << temp << ", 0" << endl;
     }
     else if (logical_op == LogicalOp::LOGICAL_AND) {
-      Result temp_1 = NEW_REG_(fcm);
-      Result temp_2 = NEW_REG_(fcm);
+      Result temp_1 = NEW_REG_;
+      Result temp_2 = NEW_REG_;
       koopa_ofs << "\t" << temp_1 << " = ne " << lhs << ", 0" << endl;
       koopa_ofs << "\t" << temp_2 << " = ne " << rhs << ", 0" << endl;
       koopa_ofs << "\t" << result << " = and " << temp_1 << ", " << temp_2 << endl;
@@ -269,7 +269,7 @@ Result EqExpWithOpAST::print() const {
   }
   // 若左右表达式结果不均为常量，则使用临时变量计算结果
   else {
-    Result result = NEW_REG_(fcm);
+    Result result = NEW_REG_;
     switch (eq_op) {
     case EqOp::EQ:
       koopa_ofs << "\t" << result << " = eq " << lhs << ", " << rhs << endl;
@@ -325,7 +325,7 @@ Result RelExpWithOpAST::print() const {
   }
   // 若左右表达式结果不均为常量，则使用临时变量计算结果
   else {
-    Result result = Result(Result::Type::REG, fcm.get_temp_count());
+    Result result = Result(Result::Type::REG, environment_manager.get_temp_count());
     switch (rel_op) {
     case RelOp::LE:
       koopa_ofs << "\t" << result << " = le " << lhs << ", " << rhs << endl;
@@ -377,7 +377,7 @@ Result AddExpWithOpAST::print() const {
   }
   // 若左右表达式结果不均为常量，则使用临时变量计算结果
   else {
-    Result result = Result(Result::Type::REG, fcm.get_temp_count());
+    Result result = Result(Result::Type::REG, environment_manager.get_temp_count());
     switch (add_op) {
     case AddOp::ADD:
       koopa_ofs << "\t" << result << " = add " << lhs << ", " << rhs << endl;
@@ -428,7 +428,7 @@ Result MulExpWithOpAST::print() const {
   }
   // 若左右表达式结果不均为常量，则使用临时变量计算结果
   else {
-    Result result = Result(Result::Type::REG, fcm.get_temp_count());
+    Result result = Result(Result::Type::REG, environment_manager.get_temp_count());
     switch (mul_op) {
     case MulOp::MUL:
       koopa_ofs << "\t" << result << " = mul " << lhs << ", " << rhs << endl;
@@ -481,7 +481,7 @@ Result UnaryExpWithOpAST::print() const {
   }
   // 若表达式结果为临时变量，则使用临时变量计算结果
   else {
-    Result result = NEW_REG_(fcm);
+    Result result = NEW_REG_;
     switch (unary_op) {
     case UnaryOp::POSITIVE:
       koopa_ofs << "\t" << result << " = add 0, " << unary_exp_result << endl;

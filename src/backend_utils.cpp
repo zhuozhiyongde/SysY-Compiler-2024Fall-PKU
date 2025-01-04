@@ -29,7 +29,14 @@ void Riscv::_add(const string& rd, const string& rs1, const string& rs2) {
 }
 
 void Riscv::_addi(const string& rd, const string& rs1, const int& imm) {
-    riscv_ofs << "\taddi " << rd << ", " << rs1 << ", " << imm << endl;
+    if (imm >= -2048 && imm < 2048) {
+        riscv_ofs << "\taddi " << rd << ", " << rs1 << ", " << imm << endl;
+    }
+    else {
+        auto reg = register_manager.tmp_reg();
+        _li(reg, imm);
+        _add(rd, rs1, reg);
+    }
 }
 
 void Riscv::_sub(const string& rd, const string& rs1, const string& rs2) {
@@ -70,7 +77,7 @@ void Riscv::_lw(const string& rd, const string& base, const int& bias) {
         riscv_ofs << "\tlw " << rd << ", " << bias << "(" << base << ")" << endl;
     }
     else {
-        auto reg = register_manager.new_reg();
+        auto reg = register_manager.tmp_reg();
         _li(reg, bias);
         _add(reg, base, reg);
         riscv_ofs << "\tlw " << rd << ", " << "(" << reg << ")" << endl;
@@ -83,21 +90,10 @@ void Riscv::_sw(const string& rs1, const string& base, const int& bias) {
         riscv_ofs << "\tsw " << rs1 << ", " << bias << "(" << base << ")" << endl;
     }
     else {
-        auto reg = register_manager.new_reg();
+        auto reg = register_manager.tmp_reg();
         _li(reg, bias);
         _add(reg, base, reg);
         riscv_ofs << "\tsw " << rs1 << ", " << "(" << reg << ")" << endl;
-    }
-}
-
-void Riscv::_add_sp(const int& bias) {
-    if (bias >= -2048 && bias < 2048) {
-        riscv_ofs << "\taddi sp, sp, " << bias << endl;
-    }
-    else {
-        auto reg = register_manager.new_reg();
-        _li(reg, bias);
-        riscv_ofs << "\tadd sp, sp, " << reg << endl;
     }
 }
 
@@ -142,6 +138,13 @@ string RegisterManager::new_reg() {
     string reg = cur_reg();
     reg_count++;
     return reg;
+}
+
+string RegisterManager::tmp_reg() {
+    reg_count++;
+    auto ret = cur_reg();
+    reg_count--;
+    return ret;
 }
 
 bool RegisterManager::get_operand_reg(const koopa_raw_value_t& value) {

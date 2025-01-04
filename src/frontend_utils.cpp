@@ -47,26 +47,26 @@ string SymbolTable::assign(const string& ident) {
     return ident + "_" + to_string(depth);
 }
 
-string FrontendContextManager::get_then_label() {
+string EnvironmentManager::get_then_label() {
     return "%then_" + to_string(if_else_count);
 }
 
-string FrontendContextManager::get_else_label() {
+string EnvironmentManager::get_else_label() {
     return "%else_" + to_string(if_else_count);
 }
 
-string FrontendContextManager::get_end_label() {
+string EnvironmentManager::get_end_label() {
     return "%end_" + to_string(if_else_count);
 }
 
-string FrontendContextManager::get_ret_end_label() {
+string EnvironmentManager::get_ret_end_label() {
     return "%return_end_" + to_string(ret_count++);
 }
 
-void FrontendContextManager::add_if_else_count() {
+void EnvironmentManager::add_if_else_count() {
     if_else_count++;
 }
 
-int FrontendContextManager::get_temp_count() {
+int EnvironmentManager::get_temp_count() {
     return temp_count++;
 }

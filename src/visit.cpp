@@ -61,12 +61,12 @@ void visit(const koopa_raw_function_t& func) {
     // 对齐到 16 的倍数
     cnt = (cnt + 15) / 16 * 16;
     // 检查是否超过 imm12 的限制
-    cnt = 8000;
+    // cnt = 8000;
     context_manager.create(func->name + 1, cnt);
     context = context_manager.get(func->name + 1);
-    riscv._add_sp(-cnt);
+    riscv._addi("sp", "sp", -cnt);
     // 检查是否超过 imm12 的限制
-    context.stack_used = 2040;
+    // context.stack_used = 2040;
     visit(func->bbs);
 };
 void visit(const koopa_raw_basic_block_t& bb) {
@@ -165,7 +165,7 @@ void visit(const koopa_raw_return_t& ret) {
     else {
         riscv._li("a0", 0);
     }
-    riscv._add_sp(context.stack_size);
+    riscv._addi("sp", "sp", context.stack_size);
     riscv._ret();
 };
 void visit(const koopa_raw_binary_t& binary, const koopa_raw_value_t& value) {

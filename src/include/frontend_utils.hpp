@@ -86,7 +86,7 @@ public:
  * @note - ret_count：return 语句的计数，用于生成 return 语句的标签
  * @note - temp_count：临时变量分配计数
  */
-class FrontendContextManager {
+class EnvironmentManager {
 private:
     int if_else_count = 0;
     int ret_count = 0;
@@ -101,4 +101,6 @@ public:
     int get_temp_count();
 };
 
-#define NEW_REG_(fcm) REG_(fcm.get_temp_count())
+extern EnvironmentManager environment_manager;
+
+#define NEW_REG_ REG_(environment_manager.get_temp_count())

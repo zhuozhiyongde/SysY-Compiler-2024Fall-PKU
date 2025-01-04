@@ -37,8 +37,6 @@ public:
     // 访存
     void _lw(const string& rd, const string& base, const int& bias);
     void _sw(const string& rs1, const string& base, const int& bias);
-    // 栈操作
-    void _add_sp(const int& bias);
     // 分支
     void _bnez(const string& cond, const string& label);
     void _beqz(const string& cond, const string& label);
@@ -85,6 +83,7 @@ public:
     unordered_map<koopa_raw_value_t, string> reg_map;
     string cur_reg();
     string new_reg();
+    string tmp_reg();
     bool get_operand_reg(const koopa_raw_value_t& value);
     void reset();
 };
