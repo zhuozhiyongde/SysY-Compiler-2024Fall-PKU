@@ -1,27 +1,96 @@
 fun @main(): i32 {
 %entry:
-	@a_1 = alloc i32
-	store 1, @a_1
-	@b_1 = alloc i32
-	store 0, @b_1
-	%0 = load @a_1
-	br %0, %short_true_0, %short_false_0
+	jump %while_entry_0
+%while_entry_0:
+	br 1, %while_body_0, %while_end_0
+%while_body_0:
+	@a_3 = alloc i32
+	store 1, @a_3
+	@b_3 = alloc i32
+	store 2, @b_3
+	%0 = load @a_3
+	%1 = eq %0, 1
+	br %1, %then_0, %else_0
+%then_0:
+	jump %while_entry_1
+%while_entry_1:
+	%2 = load @a_3
+	%3 = load @b_3
+	%4 = lt %2, %3
+	br %4, %while_body_1, %while_end_1
+%while_body_1:
+	jump %while_entry_2
+%while_entry_2:
+	%5 = load @a_3
+	%6 = load @b_3
+	%7 = lt %5, %6
+	%short_result_0 = alloc i32
+	br %7, %short_true_0, %short_false_0
 %short_true_0:
-	%1 = 1
+	store 1, %short_result_0
 	jump %short_end_0
 %short_false_0:
-	%2 = load @b_1
-	%3 = eq %2, 0
-	%1 = ne %3, 0
+	%8 = load @b_3
+	%9 = sub %8, 1
+	%10 = eq %9, 0
+	%11 = or %10, 0
+	%12 = ne %11, 0
+	store %12, %short_result_0
 	jump %short_end_0
 %short_end_0:
-	br %1, %then_0, %end_0
-%then_0:
-	store 1, @b_1
-	store 0, @a_1
+	%13 = load %short_result_0
+	br %13, %while_body_2, %while_end_2
+%while_body_2:
+	%14 = load @a_3
+	%15 = add %14, 1
+	store %15, @a_3
+	jump %while_entry_2
+%while_end_2:
+	store 1, @b_3
+	%16 = load @a_3
+	%17 = add %16, 1
+	store %17, @a_3
+	br 3, %then_1, %end_1
+%then_1:
+	jump %while_entry_1
+%jump_0:
+	jump %end_1
+%end_1:
+	jump %while_entry_1
+%while_end_1:
+	jump %end_0
+%else_0:
+	%18 = load @b_3
+	%19 = eq %18, 6
+	br %19, %then_2, %end_2
+%then_2:
+	jump %while_end_0
+%jump_1:
+	jump %end_2
+%end_2:
 	jump %end_0
 %end_0:
-	ret 77
-%return_end_0:
+	@b_4 = alloc i32
+	store 6, @b_4
+	%20 = load @b_4
+	%21 = eq %20, 6
+	br %21, %then_3, %else_3
+%then_3:
+	ret 8
+%jump_2:
+	jump %end_3
+%else_3:
+	jump %while_entry_3
+%while_entry_3:
+	br 0, %while_body_3, %while_end_3
+%while_body_3:
+	jump %while_entry_3
+%while_end_3:
+	jump %end_3
+%end_3:
+	jump %while_entry_0
+%while_end_0:
+	ret -1
+%jump_3:
 	ret 0
 }
