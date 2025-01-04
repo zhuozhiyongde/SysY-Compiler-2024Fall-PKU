@@ -1,65 +1,27 @@
 fun @main(): i32 {
 %entry:
 	@a_1 = alloc i32
-	store 0, @a_1
-	@c_1 = alloc i32
-	store 1, @c_1
-	@d_1 = alloc i32
-	store 2, @d_1
+	store 1, @a_1
+	@b_1 = alloc i32
+	store 0, @b_1
 	%0 = load @a_1
-	%2 = or %0, 0
-	%1 = ne %2, 0
-	br %1, %then_0, %else_0
+	br %0, %short_true_0, %short_false_0
+%short_true_0:
+	%1 = 1
+	jump %short_end_0
+%short_false_0:
+	%2 = load @b_1
+	%3 = eq %2, 0
+	%1 = ne %3, 0
+	jump %short_end_0
+%short_end_0:
+	br %1, %then_0, %end_0
 %then_0:
-	store 3, @c_1
-	jump %end_0
-%else_0:
-	store 3, @d_1
-	@a_3 = alloc i32
-	store 1, @a_3
-	%3 = load @a_3
-	%5 = or %3, 0
-	%4 = ne %5, 0
-	br %4, %then_1, %else_1
-%then_1:
-	store 4, @c_1
-	jump %end_1
-%else_1:
-	store 4, @d_1
-	jump %end_1
-%end_1:
-	%6 = load @a_3
-	%7 = eq %6, 0
-	br %7, %then_2, %else_2
-%then_2:
-	ret 1
-%return_end_0:
-	jump %end_2
-%else_2:
-	%8 = load @a_3
-	%9 = eq %8, 0
-	%10 = load @a_3
-	%11 = eq %10, -1
-	%13 = ne %9, 0
-	%14 = ne %11, 0
-	%12 = and %13, %14
-	br %12, %then_3, %end_3
-%then_3:
-	ret 2
-%return_end_1:
-	jump %end_3
-%end_3:
-	jump %end_2
-%end_2:
+	store 1, @b_1
+	store 0, @a_1
 	jump %end_0
 %end_0:
-	%15 = load @a_1
-	%16 = add %15, 0
-	%17 = load @c_1
-	%18 = add %16, %17
-	%19 = load @d_1
-	%20 = add %18, %19
-	ret %20
-%return_end_2:
+	ret 77
+%return_end_0:
 	ret 0
 }

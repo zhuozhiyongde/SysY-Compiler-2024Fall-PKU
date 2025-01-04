@@ -341,4 +341,3 @@ void visit(const koopa_raw_jump_t& jump) {
 实际上偏移量不是指做成 `t1(sp)`，而是先做 `t1 = bias; t1 = sp + t1`，然后再 `lw t0, (t1)`。对 `sw` 指令同理。
 
 接着是 `WA`，发现是我在处理 12 位立即数的时候，寄存器分配出现了问题，我手动调整了 `context.stack_used` 的值为临界值 `2040` 后，发现是我原先对于 `load` 处的寄存器分配有问题，我使用了 `cur_reg` 而不是 `new_reg`，这会导致如果 `load` 指令目标偏置超过 12 位立即数限制，那么在 `riscv._lw(reg, "sp", context.stack_map[load.src]);` 中，会隐式地发现偏置大于 `2048` 并再次分配 `t0` 来存储偏置，从而造成一句 `lw t0, (t0)` 的指令。修改为 `new_reg` 后，即可 AC。
-

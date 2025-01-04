@@ -59,12 +59,32 @@ string EnvironmentManager::get_end_label() {
     return "%end_" + to_string(if_else_count);
 }
 
+string EnvironmentManager::get_short_true_label() {
+    return "%short_true_" + to_string(short_circuit_count);
+}
+
+string EnvironmentManager::get_short_false_label() {
+    return "%short_false_" + to_string(short_circuit_count);
+}
+
+string EnvironmentManager::get_short_end_label() {
+    return "%short_end_" + to_string(short_circuit_count);
+}
+
+string EnvironmentManager::get_short_result_reg() {
+    return "%short_result_" + to_string(short_circuit_count);
+}
+
 string EnvironmentManager::get_ret_end_label() {
     return "%return_end_" + to_string(ret_count++);
 }
 
 void EnvironmentManager::add_if_else_count() {
     if_else_count++;
+}
+
+void EnvironmentManager::add_short_circuit_count() {
+    short_circuit_count++;
 }
 
 int EnvironmentManager::get_temp_count() {

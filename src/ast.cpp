@@ -201,40 +201,94 @@ Result LAndExpAST::print() const {
 Result LExpWithOpAST::print() const {
   // 先计算左表达式结果
   Result lhs = left->print();
-  // 短路求值
+
   if (logical_op == LogicalOp::LOGICAL_OR) {
-    if (lhs.type == Result::Type::IMM && lhs.value != 0) {
-      return IMM_(1);
+    // 左侧为立即数
+    if (lhs.type == Result::Type::IMM) {
+      if (lhs.value != 0) {
+        return IMM_(1);
+      }
+      else {
+        Result rhs = right->print();
+        return rhs;
+      }
     }
+    // 左侧不为立即数
+    auto true_label = environment_manager.get_short_true_label();
+    auto false_label = environment_manager.get_short_false_label();
+    auto end_label = environment_manager.get_short_end_label();
+    auto result = environment_manager.get_short_result_reg();
+    environment_manager.add_short_circuit_count();
+
+    // 判断是否需要生成 alloc 指令
+    if (!environment_manager.is_symbol_allocated[result]) {
+      koopa_ofs << "\t" << result << " = alloc i32" << endl;
+      environment_manager.is_symbol_allocated[result] = true;
+    }
+
+    koopa_ofs << "\tbr " << lhs << ", " << true_label << ", " << false_label << endl;
+    koopa_ofs << true_label << ":" << endl;
+    koopa_ofs << "\t" << "store 1, " << result << endl;
+    koopa_ofs << "\tjump " << end_label << endl;
+
+    koopa_ofs << false_label << ":" << endl;
+    Result rhs = right->print();
+    Result temp_1 = NEW_REG_;
+    Result temp_2 = NEW_REG_;
+    koopa_ofs << "\t" << temp_1 << " = or " << rhs << ", 0" << endl;
+    koopa_ofs << "\t" << temp_2 << " = ne " << temp_1 << ", 0" << endl;
+    koopa_ofs << "\t" << "store " << temp_2 << ", " << result << endl;
+    koopa_ofs << "\tjump " << end_label << endl;
+    koopa_ofs << end_label << ":" << endl;
+    Result result_reg = NEW_REG_;
+    koopa_ofs << "\t" << result_reg << " = load " << result << endl;
+
+    return result_reg;
   }
   else if (logical_op == LogicalOp::LOGICAL_AND) {
-    if (lhs.type == Result::Type::IMM && lhs.value == 0) {
-      return IMM_(0);
+    // 左侧为立即数
+    if (lhs.type == Result::Type::IMM) {
+      if (lhs.value == 0) {
+        return IMM_(0);
+      }
+      else {
+        Result rhs = right->print();
+        return rhs;
+      }
     }
-  }
-  // 其他情况必然需要计算右表达式结果
-  Result rhs = right->print();
-  // 若左右表达式结果均为常量，则直接返回常量结果
-  if (lhs.type == Result::Type::IMM && rhs.type == Result::Type::IMM) {
-    // 由于已经排除了短路求值的情况，所以返回结果必然是右表达式结果
-    return IMM_(rhs.value);
-  }
-  // 若左右表达式结果不均为常量，则使用临时变量计算结果
-  else {
-    Result result = NEW_REG_;
-    if (logical_op == LogicalOp::LOGICAL_OR) {
-      Result temp = NEW_REG_;
-      koopa_ofs << "\t" << temp << " = or " << lhs << ", " << rhs << endl;
-      koopa_ofs << "\t" << result << " = ne " << temp << ", 0" << endl;
+    // 左侧不为立即数
+    auto true_label = environment_manager.get_short_true_label();
+    auto false_label = environment_manager.get_short_false_label();
+    auto end_label = environment_manager.get_short_end_label();
+    auto result = environment_manager.get_short_result_reg();
+    environment_manager.add_short_circuit_count();
+
+    // 判断是否需要生成 alloc 指令
+    if (!environment_manager.is_symbol_allocated[result]) {
+      koopa_ofs << "\t" << result << " = alloc i32" << endl;
+      environment_manager.is_symbol_allocated[result] = true;
     }
-    else if (logical_op == LogicalOp::LOGICAL_AND) {
-      Result temp_1 = NEW_REG_;
-      Result temp_2 = NEW_REG_;
-      koopa_ofs << "\t" << temp_1 << " = ne " << lhs << ", 0" << endl;
-      koopa_ofs << "\t" << temp_2 << " = ne " << rhs << ", 0" << endl;
-      koopa_ofs << "\t" << result << " = and " << temp_1 << ", " << temp_2 << endl;
-    }
-    return result;
+
+    koopa_ofs << "\tbr " << lhs << ", " << true_label << ", " << false_label << endl;
+    koopa_ofs << false_label << ":" << endl;
+    koopa_ofs << "\t" << "store 0, " << result << endl;
+    koopa_ofs << "\tjump " << end_label << endl;
+
+    koopa_ofs << true_label << ":" << endl;
+    Result rhs = right->print();
+    Result temp_1 = NEW_REG_;
+    Result temp_2 = NEW_REG_;
+    Result temp_3 = NEW_REG_;
+    koopa_ofs << "\t" << temp_1 << " = ne " << lhs << ", 0" << endl;
+    koopa_ofs << "\t" << temp_2 << " = ne " << rhs << ", 0" << endl;
+    koopa_ofs << "\t" << temp_3 << " = and " << temp_1 << ", " << temp_2 << endl;
+    koopa_ofs << "\t" << "store " << temp_3 << ", " << result << endl;
+    koopa_ofs << "\tjump " << end_label << endl;
+    koopa_ofs << end_label << ":" << endl;
+    Result result_reg = NEW_REG_;
+    koopa_ofs << "\t" << result_reg << " = load " << result << endl;
+
+    return result_reg;
   }
 }
 

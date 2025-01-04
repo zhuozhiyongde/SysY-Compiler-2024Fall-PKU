@@ -89,6 +89,7 @@ public:
 class EnvironmentManager {
 private:
     int if_else_count = 0;
+    int short_circuit_count = 0;
     int ret_count = 0;
     int temp_count = 0;
 public:
@@ -96,8 +97,13 @@ public:
     string get_then_label();
     string get_else_label();
     string get_end_label();
+    string get_short_true_label();
+    string get_short_false_label();
+    string get_short_end_label();
+    string get_short_result_reg();
     string get_ret_end_label();
     void add_if_else_count();
+    void add_short_circuit_count();
     int get_temp_count();
 };
 

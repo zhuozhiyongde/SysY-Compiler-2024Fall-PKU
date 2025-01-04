@@ -22,6 +22,8 @@
         "utility": "cpp",
         "typeinfo": "cpp",
         "vector": "cpp",
-        "*.tcc": "cpp"
+        "*.tcc": "cpp",
+        "system_error": "cpp",
+        "random": "c"
     }
 }
