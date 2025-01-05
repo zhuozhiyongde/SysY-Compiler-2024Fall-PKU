@@ -7,21 +7,20 @@ decl @putarray(i32, *i32)
 decl @starttime()
 decl @stoptime()
 
-global @x_0 = alloc i32, zeroinit
-global @init_0 = alloc i32, 1
+global @a_0 = alloc i32, 0
+
+fun @f(): i32 {
+%entry:
+	@a_2 = alloc i32
+	store 1, @a_2
+	ret 0
+}
 
 fun @main(): i32 {
 %entry:
-	%0 = load @x_0
-	call @putint(%0)
-	call @putch(32)
-	call @putint(10)
-	call @putch(32)
-	call @putint(11)
-	call @putch(32)
-	%1 = load @init_0
-	call @putint(%1)
-	call @putch(10)
+	@a_2 = alloc i32
+	store 2, @a_2
+	%0 = call @f()
 	ret 0
 %jump_0:
 	ret 0

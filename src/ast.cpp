@@ -18,6 +18,8 @@ Result FuncDefAST::print() const {
   SymbolTable* parent_symbol_table = local_symbol_table;
   local_symbol_table = new SymbolTable();
   local_symbol_table->set_parent(parent_symbol_table);
+  // 清空 is_symbol_allocated
+  environment_manager.is_symbol_allocated.clear();
   koopa_ofs << "fun @" << ident;
   koopa_ofs << "(";
   if (func_f_params) {

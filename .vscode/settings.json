@@ -24,6 +24,7 @@
         "vector": "cpp",
         "*.tcc": "cpp",
         "system_error": "cpp",
-        "random": "c"
+        "random": "c",
+        "new": "cpp"
     }
 }

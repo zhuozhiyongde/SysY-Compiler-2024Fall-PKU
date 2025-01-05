@@ -1,4 +1,4 @@
-make; build/compiler -koopa hello.c -o hello.asm
+# make; build/compiler -koopa hello.c -o hello.asm
 # autotest -koopa -s lv8 /root/compiler
 # make; build/compiler -riscv hello.c -o hello.s
 # autotest -riscv -s lv8 /root/compiler
