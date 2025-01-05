@@ -40,7 +40,7 @@ using namespace std;
 
 // lexer 返回的所有 token 种类的声明
 // 注意 IDENT 和 INT_CONST 会返回 token 的值, 分别对应 str_val 和 int_val
-%token INT CONST RETURN
+%token INT VOID CONST RETURN
 %token IF ELSE WHILE BREAK CONTINUE
 %token <str_val> IDENT
 %token <str_val> EqOp RelOp AddOp NotOp MulOp AndOp OrOp
@@ -48,12 +48,13 @@ using namespace std;
 
 // 非终结符的类型定义
 // 按照给定语法规范排序
-%type <ast_val> CompUnit Decl ConstDecl ConstDef ConstInitVal VarDecl VarDef InitVal
-%type <ast_val> FuncDef FuncType
+%type <ast_val> Program CompUnit
+%type <ast_val> FuncDef FuncFParam
+%type <ast_val> Decl ConstDecl ConstDef ConstInitVal VarDecl VarDef InitVal
 %type <ast_val> Block BlockItem Stmt MatchedStmt OpenStmt
 %type <ast_val> ConstExp Exp LVal PrimaryExp UnaryExp MulExp AddExp RelExp EqExp LOrExp LAndExp
 
-%type <vec_val> ExtendBlockItem ExtendConstDef ExtendVarDef
+%type <vec_val> ExtendCompUnit ExtendBlockItem ExtendConstDef ExtendVarDef ExtendFuncFParams ExtendFuncRParams
 
 %type <int_val> Number
 
@@ -65,33 +66,83 @@ using namespace std;
 // 而 parser 一旦解析完 CompUnit, 就说明所有的 token 都被解析了, 即解析结束了
 // 此时我们应该把 FuncDef 返回的结果收集起来, 作为 AST 传给调用 parser 的函数
 
+Program
+  : CompUnit ExtendCompUnit {
+    auto program = make_unique<ProgramAST>();
+    auto comp_unit = $1;
+    vector<unique_ptr<BaseAST>> *vec = $2;
+    program->comp_units.push_back(unique_ptr<BaseAST>(comp_unit));
+    for (auto& ptr : *vec) {
+      program->comp_units.push_back(std::move(ptr));
+    }
+    ast = move(program);
+  }
+  ;
+
+ExtendCompUnit
+  : {
+    vector<unique_ptr<BaseAST>> *vec = new vector<unique_ptr<BaseAST>>;
+    $$ = vec;
+  }
+  | ExtendCompUnit CompUnit {
+    vector<unique_ptr<BaseAST>> *vec = $1;
+    vec->push_back(unique_ptr<BaseAST>($2));
+    $$ = vec;
+  }
+  ;
+
 CompUnit
   : FuncDef {
-    // 创建一个 CompUnitAST 对象
-    auto comp_unit = make_unique<CompUnitAST>();
-    // $1 指代规则里第一个符号的返回值, 也就是 FuncDef 的返回值
-    comp_unit->func_def = unique_ptr<BaseAST>($1);
-    // move 是 C++11 引入的移动语义, 用于将 unique_ptr 的所有权从一个变量移动到另一个变量
-    // 这里我们把 comp_unit 的所有权移动给 ast, 这样 ast 就指向了 comp_unit 所指向的内存
-    ast = move(comp_unit);
+    $$ = $1;
+  }
+  | Decl {
+    $$ = $1;
   }
   ;
 
 FuncDef
-  : FuncType IDENT '(' ')' Block {
+  : INT IDENT '(' ExtendFuncFParams ')' Block {
     auto ast = new FuncDefAST();
-    ast->func_type = unique_ptr<BaseAST>($1);
+    ast->func_type = FuncDefAST::FuncType::INT;
     ast->ident = *unique_ptr<string>($2);
-    ast->block = unique_ptr<BaseAST>($5);
+    vector<unique_ptr<BaseAST>> *vec = $4;
+    ast->func_f_params = vec;
+    ast->block = unique_ptr<BaseAST>($6);
     // $$ 是 Bison 提供的宏, 它代表当前规则的返回值
+    $$ = ast;
+  }
+  | VOID IDENT '(' ExtendFuncFParams ')' Block {
+    auto ast = new FuncDefAST();
+    ast->func_type = FuncDefAST::FuncType::VOID;
+    ast->ident = *unique_ptr<string>($2);
+    vector<unique_ptr<BaseAST>> *vec = $4;
+    ast->func_f_params = vec;
+    ast->block = unique_ptr<BaseAST>($6);
     $$ = ast;
   }
   ;
 
-FuncType
-  : INT {
-    auto ast = new FuncTypeAST();
-    ast->type = "i32";
+ExtendFuncFParams
+  : {
+    vector<unique_ptr<BaseAST>> *vec = new vector<unique_ptr<BaseAST>>;
+    $$ = vec;
+  }
+  | FuncFParam {
+    vector<unique_ptr<BaseAST>> *vec = new vector<unique_ptr<BaseAST>>;
+    vec->push_back(unique_ptr<BaseAST>($1));
+    $$ = vec;
+  }
+  | ExtendFuncFParams ',' FuncFParam {
+    vector<unique_ptr<BaseAST>> *vec = $1;
+    vec->push_back(unique_ptr<BaseAST>($3));
+    $$ = vec;
+  }
+  ;
+
+FuncFParam
+  : INT IDENT {
+    auto ast = new FuncFParamAST();
+    ast->ident = *unique_ptr<string>($2);
     $$ = ast;
   }
   ;
@@ -448,6 +499,30 @@ UnaryExp
     ast->unary_op = ast->convert(not_op);
     ast->unary_exp = unique_ptr<BaseAST>($2);
     $$ = ast;
+  }
+  | IDENT '(' ExtendFuncRParams ')' {
+    auto ast = new UnaryExpWithFuncCallAST();
+    ast->ident = *unique_ptr<string>($1);
+    vector<unique_ptr<BaseAST>> *vec = $3;
+    ast->func_r_params = vec;
+    $$ = ast;
+  }
+  ;
+
+ExtendFuncRParams
+  : {
+    vector<unique_ptr<BaseAST>> *vec = new vector<unique_ptr<BaseAST>>;
+    $$ = vec;
+  }
+  | Exp {
+    vector<unique_ptr<BaseAST>> *vec = new vector<unique_ptr<BaseAST>>;
+    vec->push_back(unique_ptr<BaseAST>($1));
+    $$ = vec;
+  }
+  | ExtendFuncRParams ',' Exp {
+    vector<unique_ptr<BaseAST>> *vec = $1;
+    vec->push_back(unique_ptr<BaseAST>($3));
+    $$ = vec;
   }
   ;
 

@@ -125,3 +125,20 @@ int EnvironmentManager::get_while_count() {
 int EnvironmentManager::get_while_current() {
     return while_current;
 }
+
+void init_lib() {
+    koopa_ofs << "decl @getint(): i32" << endl;
+    koopa_ofs << "decl @getch(): i32" << endl;
+    koopa_ofs << "decl @getarray(*i32): i32" << endl;
+    environment_manager.is_func_return["getint"] = true;
+    environment_manager.is_func_return["getch"] = true;
+    environment_manager.is_func_return["getarray"] = true;
+
+    koopa_ofs << "decl @putint(i32)" << endl;
+    koopa_ofs << "decl @putch(i32)" << endl;
+    koopa_ofs << "decl @putarray(i32, *i32)" << endl;
+
+    koopa_ofs << "decl @starttime()" << endl;
+    koopa_ofs << "decl @stoptime()" << endl;
+    koopa_ofs << endl;
+}

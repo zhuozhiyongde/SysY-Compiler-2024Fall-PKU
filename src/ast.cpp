@@ -4,23 +4,71 @@ SymbolTable global_symbol_table;
 SymbolTable* local_symbol_table = &global_symbol_table;
 EnvironmentManager environment_manager;
 
-Result CompUnitAST::print() const {
-  return func_def->print();
-}
-
-Result FuncDefAST::print() const {
-  koopa_ofs << "fun @" << ident << "(): ";
-  func_type->print();
-  koopa_ofs << " {" << endl;
-  koopa_ofs << "%entry:" << endl;
-  block->print();
-  koopa_ofs << "\tret 0" << endl;
-  koopa_ofs << "}" << endl;
+Result ProgramAST::print() const {
+  init_lib();
+  for (auto& comp_unit : comp_units) {
+    comp_unit->print();
+  }
   return Result();
 }
 
-Result FuncTypeAST::print() const {
-  koopa_ofs << type;
+Result FuncDefAST::print() const {
+  koopa_ofs << endl;
+  environment_manager.is_global = false;
+  SymbolTable* parent_symbol_table = local_symbol_table;
+  local_symbol_table = new SymbolTable();
+  local_symbol_table->set_parent(parent_symbol_table);
+  koopa_ofs << "fun @" << ident;
+  koopa_ofs << "(";
+  if (func_f_params) {
+    for (size_t i = 0; i < func_f_params->size(); i++) {
+      // 转换为 FuncFParamAST
+      ((FuncFParamAST*)func_f_params->at(i).get())->as_param();
+      if (i != func_f_params->size() - 1) {
+        koopa_ofs << ", ";
+      }
+    }
+  }
+  koopa_ofs << ")";
+  if (func_type == FuncType::INT) {
+    koopa_ofs << ": i32";
+    environment_manager.is_func_return[ident] = true;
+  }
+  else {
+    environment_manager.is_func_return[ident] = false;
+  }
+  koopa_ofs << " {" << endl;
+  koopa_ofs << "%entry:" << endl;
+  for (auto& item : *func_f_params) {
+    item->print();
+  }
+  block->print();
+  if (func_type == FuncType::INT) {
+    koopa_ofs << "\tret 0" << endl;
+  }
+  else {
+    koopa_ofs << "\tret" << endl;
+  }
+  koopa_ofs << "}" << endl;
+  delete local_symbol_table;
+  local_symbol_table = parent_symbol_table;
+  environment_manager.is_global = true;
+  return Result();
+}
+
+void FuncFParamAST::as_param() const {
+  koopa_ofs << "@" << ident << ": i32";
+}
+
+Result FuncFParamAST::print() const {
+  //  %x = alloc i32
+  // store @x, %x
+  // 在当前层级符号表中创建变量
+  string ident_with_suffix = local_symbol_table->assign(ident);
+  koopa_ofs << "\t@" << ident_with_suffix << " = alloc i32" << endl;
+  koopa_ofs << "\tstore @" << ident << ", @" << ident_with_suffix << endl;
+  // 在当前层级符号表中创建变量
+  local_symbol_table->create(ident_with_suffix, VAR_);
   return Result();
 }
 
@@ -73,15 +121,28 @@ Result VarDeclAST::print() const {
 Result VarDefAST::print() const {
   // 在当前层级符号表中分配变量
   string ident_with_suffix = local_symbol_table->assign(ident);
-  // 判断是否需要生成 alloc 指令
-  if (!environment_manager.is_symbol_allocated[ident_with_suffix]) {
-    koopa_ofs << "\t@" << ident_with_suffix << " = alloc i32" << endl;
-    environment_manager.is_symbol_allocated[ident_with_suffix] = true;
+  if (environment_manager.is_global) {
+    // global @var = alloc i32, zeroinit
+    if (value) {
+      Result value_result = (*value)->print();
+      assert(value_result.type == Result::Type::IMM);
+      koopa_ofs << "global @" << ident_with_suffix << " = alloc i32, " << value_result << endl;
+    }
+    else {
+      koopa_ofs << "global @" << ident_with_suffix << " = alloc i32, zeroinit" << endl;
+    }
   }
-  // 若初始值不为空，则生成 store 指令
-  if (value) {
-    Result value_result = (*value)->print();
-    koopa_ofs << "\tstore " << value_result << ", @" << ident_with_suffix << endl;
+  else {
+    // 判断是否需要生成 alloc 指令
+    if (!environment_manager.is_symbol_allocated[ident_with_suffix]) {
+      koopa_ofs << "\t@" << ident_with_suffix << " = alloc i32" << endl;
+      environment_manager.is_symbol_allocated[ident_with_suffix] = true;
+    }
+    // 若初始值不为空，则生成 store 指令
+    if (value) {
+      Result value_result = (*value)->print();
+      koopa_ofs << "\tstore " << value_result << ", @" << ident_with_suffix << endl;
+    }
   }
   // 在当前层级符号表中创建变量
   local_symbol_table->create(ident_with_suffix, VAR_);
@@ -332,6 +393,9 @@ Result LExpWithOpAST::print() const {
     koopa_ofs << "\t" << result_reg << " = load " << result << endl;
 
     return result_reg;
+  }
+  else {
+    assert(false);
   }
 }
 
@@ -593,6 +657,37 @@ Result UnaryExpWithOpAST::print() const {
       assert(false);
     }
     return result;
+  }
+}
+
+Result UnaryExpWithFuncCallAST::print() const {
+  vector<Result> params;
+  for (auto& param : *func_r_params) {
+    params.push_back(param->print());
+  }
+
+  if (environment_manager.is_func_return[ident]) {
+    Result result = NEW_REG_;
+    koopa_ofs << "\t" << result << " = call @" << ident << "(";
+    for (size_t i = 0; i < params.size(); i++) {
+      koopa_ofs << params[i];
+      if (i != params.size() - 1) {
+        koopa_ofs << ", ";
+      }
+    }
+    koopa_ofs << ")" << endl;
+    return result;
+  }
+  else {
+    koopa_ofs << "\tcall @" << ident << "(";
+    for (size_t i = 0; i < params.size(); i++) {
+      koopa_ofs << params[i];
+      if (i != params.size() - 1) {
+        koopa_ofs << ", ";
+      }
+    }
+    koopa_ofs << ")" << endl;
+    return Result();
   }
 }
 

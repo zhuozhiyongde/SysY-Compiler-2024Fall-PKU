@@ -1,7 +1,7 @@
 make; build/compiler -koopa hello.c -o hello.asm
-# autotest -koopa -s lv7 /root/compiler
+# autotest -koopa -s lv8 /root/compiler
 # make; build/compiler -riscv hello.c -o hello.s
-# autotest -riscv -s lv7 /root/compiler
+# autotest -riscv -s lv8 /root/compiler
 
 
 # 测试 Koopa

@@ -98,7 +98,10 @@ private:
     // 当前正在处理的 while 语句标号（break/continue）
     int while_current = 0;
 public:
+    // 当前是否为全局，用于控制 Decl 语句的生成
+    bool is_global = true;
     unordered_map<string, bool> is_symbol_allocated;
+    unordered_map<string, bool> is_func_return;
     // if-else 语句
     string get_then_label();
     string get_else_label();
@@ -127,3 +130,7 @@ public:
 extern EnvironmentManager environment_manager;
 
 #define NEW_REG_ REG_(environment_manager.get_temp_count())
+
+extern ofstream koopa_ofs;
+
+void init_lib();
