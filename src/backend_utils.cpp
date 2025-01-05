@@ -22,6 +22,10 @@ void parse_riscv(const char* koopa_ir) {
     koopa_delete_raw_program_builder(builder);
 }
 
+void Riscv::_call(const string& ident) {
+    riscv_ofs << "\tcall " << ident << endl;
+}
+
 void Riscv::_ret() {
     riscv_ofs << "\tret" << endl;
 }
@@ -131,9 +135,13 @@ void Riscv::_jump(const string& label) {
     riscv_ofs << "\tj " << label << endl;
 }
 
+// 将一个指令的结果存储到栈中，与 _sw 不同，_sw 也可以将一个寄存器的值存到栈中。
 void Context::push(const koopa_raw_value_t& value, int bias) {
+    // string msg = "bias: " + to_string(bias) + " stack_size: " + to_string(stack_size);
+    // cout << msg << endl;
     assert(bias < stack_size);
     stack_map[value] = bias;
+    stack_used += 4;
 }
 
 
@@ -170,6 +178,7 @@ string RegisterManager::tmp_reg() {
 }
 
 bool RegisterManager::get_operand_reg(const koopa_raw_value_t& value) {
+    // 运算数为整数
     if (value->kind.tag == KOOPA_RVT_INTEGER) {
         if (value->kind.data.integer.value == 0) {
             reg_map[value] = "x0";
@@ -192,6 +201,29 @@ bool RegisterManager::get_operand_reg(const koopa_raw_value_t& value) {
     else if (value->kind.tag == KOOPA_RVT_BINARY) {
         reg_map[value] = new_reg();
         riscv._lw(reg_map[value], "sp", context.stack_map[value]);
+        return true;
+    }
+    // 运算数为 call 指令的返回值
+    else if (value->kind.tag == KOOPA_RVT_CALL) {
+        reg_map[value] = new_reg();
+        riscv._lw(reg_map[value], "sp", context.stack_map[value]);
+        return true;
+    }
+    // 运算数为函数参数
+    else if (value->kind.tag == KOOPA_RVT_FUNC_ARG_REF) {
+        auto index = value->kind.data.func_arg_ref.index;
+        // 前 8 个参数放在 a0 到 a7 寄存器中
+        if (index < 8) {
+            reg_map[value] = "a" + to_string(index);
+        }
+        // 再后面的参数要从栈上找
+        else {
+            // 先获取栈帧大小
+            reg_map[value] = new_reg();
+            int stack_size = context.stack_size;
+            int offset = 4 * (index - 8);
+            riscv._lw(reg_map[value], "sp", stack_size + offset);
+        }
         return true;
     }
     return true;

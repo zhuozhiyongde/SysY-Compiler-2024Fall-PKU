@@ -8,3 +8,5 @@ using namespace std;
 string koopaRawValueTagToString(int tag);
 
 string koopaRawBinaryOpToString(int op);
+
+string koopaRawSliceKindItemToString(int kind);

@@ -19,6 +19,8 @@ void parse_riscv(const char* koopa_ir);
  */
 class Riscv {
 public:
+    // 调用与返回
+    void _call(const string& ident);
     void _ret();
     // 单目运算
     void _seqz(const string& rd, const string& rs1);
@@ -56,6 +58,7 @@ class Context {
 public:
     int stack_size;
     int stack_used = 0;
+    bool save_ra = false;
     unordered_map<koopa_raw_value_t, int> stack_map;
     Context() : stack_size(0) {}
     Context(int stack_size) : stack_size(stack_size) {}

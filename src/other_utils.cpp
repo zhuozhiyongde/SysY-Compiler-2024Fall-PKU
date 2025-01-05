@@ -82,3 +82,16 @@ string koopaRawBinaryOpToString(int op) {
         return "UNKNOWN_OP";
     }
 }
+
+string koopaRawSliceKindItemToString(int kind) {
+    switch (kind) {
+    case koopa_raw_slice_item_kind_t::KOOPA_RSIK_FUNCTION:
+        return "KOOPA_RSIK_PROGRAM";
+    case koopa_raw_slice_item_kind_t::KOOPA_RSIK_BASIC_BLOCK:
+        return "KOOPA_RSIK_BASIC_BLOCK";
+    case koopa_raw_slice_item_kind_t::KOOPA_RSIK_VALUE:
+        return "KOOPA_RSIK_VALUE";
+    default:
+        return "UNKNOWN_KIND";
+    }
+}

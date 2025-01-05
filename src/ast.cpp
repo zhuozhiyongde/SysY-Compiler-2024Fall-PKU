@@ -40,7 +40,7 @@ Result FuncDefAST::print() const {
     environment_manager.is_func_return[ident] = false;
   }
   koopa_ofs << " {" << endl;
-  koopa_ofs << "%entry:" << endl;
+  koopa_ofs << "%" << ident << "_entry:" << endl;
   for (auto& item : *func_f_params) {
     item->print();
   }
