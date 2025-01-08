@@ -19,6 +19,13 @@ void parse_riscv(const char* koopa_ir);
  */
 class Riscv {
 public:
+    // 特殊语句
+    void _data();
+    void _text();
+    void _globl(const string& name);
+    void _word(const int& value);
+    void _zero(const int& len);
+    void _label(const string& name);
     // 调用与返回
     void _call(const string& ident);
     void _ret();
@@ -27,6 +34,7 @@ public:
     void _snez(const string& rd, const string& rs1);
     void _li(const string& rd, const int& imm);
     void _mv(const string& rd, const string& rs1);
+    void _la(const string& rd, const string& rs1);
     // 双目运算
     void _or(const string& rd, const string& rs1, const string& rs2);
     void _and(const string& rd, const string& rs1, const string& rs2);
@@ -70,10 +78,15 @@ public:
  * @note - context_map：Context 映射，用于管理 Context 的使用情况
  */
 class ContextManager {
+private:
+    int global_count = 0;
 public:
     unordered_map<string, Context> context_map;
-    void create(const string& name, int stack_size);
-    Context& get(const string& name);
+    unordered_map<koopa_raw_value_t, string> global_map;
+    void create_context(const string& name, int stack_size);
+    void create_global(const koopa_raw_value_t& value);
+    Context& get_context(const string& name);
+    string get_global(const koopa_raw_value_t& value);
 };
 
 /**

@@ -22,6 +22,30 @@ void parse_riscv(const char* koopa_ir) {
     koopa_delete_raw_program_builder(builder);
 }
 
+void Riscv::_data() {
+    riscv_ofs << "\t.data" << endl;
+}
+
+void Riscv::_text() {
+    riscv_ofs << "\t.text" << endl;
+}
+
+void Riscv::_globl(const string& name) {
+    riscv_ofs << "\t.globl " << name << endl;
+}
+
+void Riscv::_word(const int& value) {
+    riscv_ofs << "\t.word " << value << endl;
+}
+
+void Riscv::_zero(const int& len) {
+    riscv_ofs << "\t.zero " << len << endl;
+}
+
+void Riscv::_label(const string& name) {
+    riscv_ofs << name << ":" << endl;
+}
+
 void Riscv::_call(const string& ident) {
     riscv_ofs << "\tcall " << ident << endl;
 }
@@ -97,6 +121,10 @@ void Riscv::_mv(const string& rd, const string& rs1) {
     riscv_ofs << "\tmv " << rd << ", " << rs1 << endl;
 }
 
+void Riscv::_la(const string& rd, const string& rs1) {
+    riscv_ofs << "\tla " << rd << ", " << rs1 << endl;
+}
+
 void Riscv::_lw(const string& rd, const string& base, const int& bias) {
     // 检查偏移量是否在 12 位立即数范围内
     if (bias >= -2048 && bias < 2048) {
@@ -144,13 +172,22 @@ void Context::push(const koopa_raw_value_t& value, int bias) {
     stack_used += 4;
 }
 
-
-void ContextManager::create(const string& name, int stack_size) {
+void ContextManager::create_context(const string& name, int stack_size) {
     context_map[name] = Context(stack_size);
 }
 
-Context& ContextManager::get(const string& name) {
+Context& ContextManager::get_context(const string& name) {
     return context_map[name];
+}
+
+void ContextManager::create_global(const koopa_raw_value_t& value) {
+    auto global_name = "global_" + to_string(global_count);
+    global_count++;
+    global_map[value] = global_name;
+}
+
+string ContextManager::get_global(const koopa_raw_value_t& value) {
+    return global_map[value];
 }
 
 string RegisterManager::cur_reg() {
@@ -178,6 +215,7 @@ string RegisterManager::tmp_reg() {
 }
 
 bool RegisterManager::get_operand_reg(const koopa_raw_value_t& value) {
+    printf("get_operand_reg: %s\n", koopaRawValueTagToString(value->kind.tag).c_str());
     // 运算数为整数
     if (value->kind.tag == KOOPA_RVT_INTEGER) {
         if (value->kind.data.integer.value == 0) {
@@ -218,13 +256,18 @@ bool RegisterManager::get_operand_reg(const koopa_raw_value_t& value) {
         }
         // 再后面的参数要从栈上找
         else {
-            // 先获取栈帧大小
+            // 先获取当前栈帧大小
             reg_map[value] = new_reg();
             int stack_size = context.stack_size;
             int offset = 4 * (index - 8);
+            // 从上一个栈帧中获取
             riscv._lw(reg_map[value], "sp", stack_size + offset);
         }
         return true;
+    }
+    else {
+        auto msg = "Invalid operand: " + koopaRawValueTagToString(value->kind.tag);
+        assert(false && msg.c_str());
     }
     return true;
 }

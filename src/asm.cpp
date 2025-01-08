@@ -48,9 +48,9 @@ void visit(const koopa_raw_function_t& func) {
     // 访问所有基本块，bbs: basic block slice
     // 忽略函数名前的@，@main -> main
     riscv_ofs << endl;
-    riscv_ofs << "\t.text" << endl;
-    riscv_ofs << "\t.globl " << func->name + 1 << endl;
-    riscv_ofs << func->name + 1 << ":" << endl;
+    riscv._text();
+    riscv._globl(func->name + 1);
+    riscv._label(func->name + 1);
     int cnt = 0;
     int stack_args = 0;
     bool has_call = false;
@@ -80,9 +80,9 @@ void visit(const koopa_raw_function_t& func) {
     cnt = (cnt + 15) / 16 * 16;
     // 检查是否超过 imm12 的限制
     // cnt = 8000;
-    context_manager.create(func->name + 1, cnt);
-    context = context_manager.get(func->name + 1);
+    context_manager.create_context(func->name + 1, cnt);
     riscv._addi("sp", "sp", -cnt);
+    context = context_manager.get_context(func->name + 1);
     // 检查是否超过 imm12 的限制
     // context.stack_used = 2040;
     // 存储 ra 寄存器到 0(sp)
@@ -103,6 +103,7 @@ void visit(const koopa_raw_value_t& value) {
     const auto& kind = value->kind;
     // RVT: Raw Value Tag, 区分指令类型
     register_manager.reset();
+    // printf("visit: %s\n", koopaRawValueTagToString(kind.tag).c_str());
     switch (kind.tag) {
     case KOOPA_RVT_RETURN:
         // 访问 return 指令
@@ -116,6 +117,10 @@ void visit(const koopa_raw_value_t& value) {
         break;
     case KOOPA_RVT_ALLOC:
         // 访问 alloc 指令，不管
+        break;
+    case KOOPA_RVT_GLOBAL_ALLOC:
+        // 访问 global_alloc 指令
+        visit(kind.data.global_alloc, value);
         break;
     case KOOPA_RVT_STORE:
         // 访问 store 指令
@@ -145,6 +150,27 @@ void visit(const koopa_raw_value_t& value) {
         assert(false);
     }
 };
+
+void visit(const koopa_raw_global_alloc_t& global_alloc, const koopa_raw_value_t& value) {
+    // 访问 global_alloc 指令
+    riscv_ofs << endl;
+    context_manager.create_global(value);
+    auto global_name = context_manager.get_global(value);
+    riscv._data();
+    riscv._globl(global_name);
+    riscv._label(global_name);
+    auto init = global_alloc.init;
+    switch (init->kind.tag) {
+    case KOOPA_RVT_INTEGER:
+        riscv._word(init->kind.data.integer.value);
+        break;
+    case KOOPA_RVT_ZERO_INIT:
+        riscv._zero(4);
+        break;
+    default:
+        assert(false);
+    }
+}
 
 void visit(const koopa_raw_call_t& call, const koopa_raw_value_t& value) {
     int args = call.args.len;
@@ -206,14 +232,32 @@ void visit(const koopa_raw_jump_t& jump) {
 void visit(const koopa_raw_load_t& load, const koopa_raw_value_t& value) {
     auto reg = register_manager.new_reg();
     auto bias = context.stack_used;
-    riscv._lw(reg, "sp", context.stack_map[load.src]);
+    printf("load: %s\n", koopaRawValueTagToString(load.src->kind.tag).c_str());
+    // 如果是全局变量，需要先获取地址，再获取值
+    if (load.src->kind.tag == KOOPA_RVT_GLOBAL_ALLOC) {
+        riscv._la(reg, context_manager.get_global(load.src));
+        riscv._lw(reg, reg, 0);
+    }
+    // 如果是栈上变量，直接获取值
+    else {
+        riscv._lw(reg, "sp", context.stack_map[load.src]);
+    }
     context.push(value, bias);
     riscv._sw(reg, "sp", bias);
 }
 
 void visit(const koopa_raw_store_t& store) {
+    printf("store value: %s\n", koopaRawValueTagToString(store.value->kind.tag).c_str());
+    printf("store dest: %s\n", koopaRawValueTagToString(store.dest->kind.tag).c_str());
     register_manager.get_operand_reg(store.value);
-    // 如果 dest 不在 stack_map 中，则需要分配新的空间
+    // 如果是全局变量，需要先获取地址，再存储
+    if (store.dest->kind.tag == KOOPA_RVT_GLOBAL_ALLOC) {
+        auto reg = register_manager.new_reg();
+        riscv._la(reg, context_manager.get_global(store.dest));
+        riscv._sw(register_manager.reg_map[store.value], reg, 0);
+        return;
+    }
+    // 如果是栈上变量，且 dest 不在 stack_map 中（我们没处理过 alloc），则需要分配新的空间
     if (context.stack_map.find(store.dest) == context.stack_map.end()) {
         context.push(store.dest, context.stack_used);
     }
@@ -224,25 +268,21 @@ void visit(const koopa_raw_store_t& store) {
 void visit(const koopa_raw_return_t& ret) {
     // 先把值搞到 a0 寄存器中
     if (ret.value != nullptr) {
+        printf("return: %s\n", koopaRawValueTagToString(ret.value->kind.tag).c_str());
         // 形如 ret 1 直接返回整数的
-        if (ret.value->kind.tag == KOOPA_RVT_INTEGER) {
+        switch (ret.value->kind.tag) {
+        case KOOPA_RVT_INTEGER:
             riscv._li("a0", ret.value->kind.data.integer.value);
-        }
-        // 形如 ret exp, 返回表达式的值
-        else if (ret.value->kind.tag == KOOPA_RVT_BINARY) {
+            break;
+            // 形如 ret exp, 返回表达式的值
+        case KOOPA_RVT_BINARY:
+        case KOOPA_RVT_LOAD:
+        case KOOPA_RVT_CALL:
             riscv._lw("a0", "sp", context.stack_map[ret.value]);
-            // 或者使用 mv 指令，将寄存器中的值赋值给 a0
-            // riscv._mv("a0", register_manager.reg_map[ret.value]);
-        }
-        else if (ret.value->kind.tag == KOOPA_RVT_LOAD) {
-            riscv._lw("a0", "sp", context.stack_map[ret.value]);
-        }
-        else if (ret.value->kind.tag == KOOPA_RVT_CALL) {
-            // 此时必然是有返回值的
-            riscv._lw("a0", "sp", context.stack_map[ret.value]);
-        }
-        else {
-            riscv._li("a0", 0);
+            break;
+        default:
+            assert(false && "Invalid return value");
+            // riscv._li("a0", 0);
         }
     }
     // 返回
