@@ -1,20 +1,20 @@
 
-	.text
-	.globl f
-f:
-	addi sp, sp, 0
-f_entry:
-	addi sp, sp, 0
-	ret
+	.data
+	.globl global_0
+global_0:
+	.word 2
 
 	.text
 	.globl main
 main:
 	addi sp, sp, -16
-	sw ra, 12(sp)
 main_entry:
-	call f
-	li a0, 1
-	lw ra, 12(sp)
+	li t0, 3
+	la t1, global_0
+	sw t0, 0(t1)
+	la t0, global_0
+	lw t0, 0(t0)
+	sw t0, 0(sp)
+	lw a0, 0(sp)
 	addi sp, sp, 16
 	ret

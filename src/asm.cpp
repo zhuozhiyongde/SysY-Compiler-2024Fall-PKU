@@ -146,7 +146,7 @@ void visit(const koopa_raw_value_t& value) {
         break;
     default:
         // 其他类型暂时遇不到
-        cout << "Invalid instruction: " << koopaRawValueTagToString(kind.tag) << endl;
+        printf("Invalid instruction: %s\n", koopaRawValueTagToString(kind.tag).c_str());
         assert(false);
     }
 };
@@ -362,7 +362,7 @@ void visit(const koopa_raw_binary_t& binary, const koopa_raw_value_t& value) {
         riscv._rem(cur, lhs, rhs);
         break;
     default:
-        riscv_ofs << "Invalid binary operation: " << koopaRawBinaryOpToString(binary.op) << endl;
+        printf("Invalid binary operation: %s\n", koopaRawBinaryOpToString(binary.op).c_str());
     }
     // 把结果存回栈中
     context.push(value, context.stack_used);

@@ -1,6 +1,6 @@
-void f() {}
+int a = 2;
 
 int main() {
-  f();
-  return 1;
+  a = 3;
+  return a;
 }
