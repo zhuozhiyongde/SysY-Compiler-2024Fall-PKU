@@ -54,7 +54,7 @@ using namespace std;
 %type <ast_val> Block BlockItem Stmt MatchedStmt OpenStmt
 %type <ast_val> ConstExp Exp LVal PrimaryExp UnaryExp MulExp AddExp RelExp EqExp LOrExp LAndExp
 
-%type <vec_val> ExtendCompUnit ExtendBlockItem ExtendConstDef ExtendVarDef ExtendFuncFParams ExtendFuncRParams
+%type <vec_val> ExtendCompUnit ExtendBlockItem ExtendConstDef ExtendVarDef ExtendFuncFParams ExtendFuncRParams ExtendArrayIndex ExtendConstInitVal ExtendInitVal
 
 %type <int_val> Number
 
@@ -223,11 +223,24 @@ ExtendConstDef
   ;
 
 ConstDef
-  : IDENT '=' ConstInitVal {
+  : IDENT ExtendArrayIndex '=' ConstInitVal {
     auto ast = new ConstDefAST();
     ast->ident = *unique_ptr<string>($1);
-    ast->value = unique_ptr<BaseAST>($3);
+    vector<unique_ptr<BaseAST>> *vec = $2;
+    ast->array_index = vec;
+    ast->value = unique_ptr<BaseAST>($4);
     $$ = ast;
+  }
+
+ExtendConstInitVal
+  : {
+    vector<unique_ptr<BaseAST>> *vec = new vector<unique_ptr<BaseAST>>;
+    $$ = vec;
+  }
+  | ExtendConstInitVal ',' ConstInitVal {
+    vector<unique_ptr<BaseAST>> *vec = $1;
+    vec->push_back(unique_ptr<BaseAST>($3));
+    $$ = vec;
   }
   ;
 
@@ -236,6 +249,34 @@ ConstInitVal
     auto ast = new ConstInitValAST();
     ast->const_exp = unique_ptr<BaseAST>($1);
     $$ = ast;
+  }
+  | '{' '}' {
+    auto ast = new ConstInitValAST();
+    ast->init_values.emplace();
+    $$ = ast;
+  }
+  | '{' ConstInitVal ExtendConstInitVal '}' {
+    auto ast = new ConstInitValAST();
+    auto const_init_val = $2;
+    vector<unique_ptr<BaseAST>> *vec = $3;
+    ast->init_values.emplace();
+    ast->init_values->push_back(unique_ptr<BaseAST>(const_init_val));
+    for (auto& ptr : *vec) {
+      ast->init_values->push_back(std::move(ptr));
+    }
+    $$ = ast;
+  }
+  ;
+
+ExtendArrayIndex
+  : {
+    vector<unique_ptr<BaseAST>> *vec = new vector<unique_ptr<BaseAST>>;
+    $$ = vec;
+  }
+  | ExtendArrayIndex '[' ConstExp ']' {
+    vector<unique_ptr<BaseAST>> *vec = $1;
+    vec->push_back(unique_ptr<BaseAST>($3));
+    $$ = vec;
   }
   ;
 
@@ -273,16 +314,32 @@ ExtendVarDef
   ;
 
 VarDef
-  : IDENT {
+  : IDENT ExtendArrayIndex {
     auto ast = new VarDefAST();
     ast->ident = *unique_ptr<string>($1);
+    vector<unique_ptr<BaseAST>> *vec = $2;
+    ast->array_index = vec;
     $$ = ast;
   }
-  | IDENT '=' InitVal {
+  | IDENT ExtendArrayIndex '=' InitVal {
     auto ast = new VarDefAST();
     ast->ident = *unique_ptr<string>($1);
-    ast->value = unique_ptr<BaseAST>($3);
+    vector<unique_ptr<BaseAST>> *vec = $2;
+    ast->array_index = vec;
+    ast->value = unique_ptr<BaseAST>($4);
     $$ = ast;
+  }
+  ;
+
+ExtendInitVal
+  : {
+    vector<unique_ptr<BaseAST>> *vec = new vector<unique_ptr<BaseAST>>;
+    $$ = vec;
+  }
+  | ExtendInitVal ',' InitVal {
+    vector<unique_ptr<BaseAST>> *vec = $1;
+    vec->push_back(unique_ptr<BaseAST>($3));
+    $$ = vec;
   }
   ;
 
@@ -290,6 +347,22 @@ InitVal
   : Exp {
     auto ast = new InitValAST();
     ast->exp = unique_ptr<BaseAST>($1);
+    $$ = ast;
+  }
+  | '{' '}' {
+    auto ast = new InitValAST();
+    ast->init_values.emplace();
+    $$ = ast;
+  }
+  | '{' InitVal ExtendInitVal '}' {
+    auto ast = new InitValAST();
+    auto init_val = $2;
+    vector<unique_ptr<BaseAST>> *vec = $3;
+    ast->init_values.emplace();
+    ast->init_values->push_back(unique_ptr<BaseAST>(init_val));
+    for (auto& ptr : *vec) {
+      ast->init_values->push_back(std::move(ptr));
+    }
     $$ = ast;
   }
   ;
@@ -371,9 +444,11 @@ OpenStmt
   ;
 
 LVal
-  : IDENT {
+  : IDENT ExtendArrayIndex {
     auto ast = new LValAST();
     ast->ident = *unique_ptr<string>($1);
+    vector<unique_ptr<BaseAST>> *vec = $2;
+    ast->array_index = vec;
     $$ = ast;
   }
   ;

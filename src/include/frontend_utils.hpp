@@ -20,7 +20,8 @@ class Symbol {
 public:
     enum class Type {
         VAR,
-        VAL
+        VAL,
+        ARR
     };
     Type type;
     int value;
@@ -29,6 +30,7 @@ public:
 };
 
 #define VAR_ Symbol(Symbol::Type::VAR, 0)
+#define ARR_ Symbol(Symbol::Type::ARR, 0)
 #define VAL_(value) Symbol(Symbol::Type::VAL, value)
 
 /**
@@ -92,7 +94,6 @@ private:
     int short_circuit_count = 0;
     // 包括 ret/break/continue 三种跳转语句
     int jump_count = 0;
-    int temp_count = 0;
     // while 最大标号（生成 label）
     int while_count = 0;
     // 当前正在处理的 while 语句标号（break/continue）
@@ -100,6 +101,8 @@ private:
 public:
     // 当前是否为全局，用于控制 Decl 语句的生成
     bool is_global = true;
+    // 临时变量分配计数
+    int temp_count = 0;
     unordered_map<string, bool> is_symbol_allocated;
     unordered_map<string, bool> is_func_return;
     // if-else 语句
@@ -129,8 +132,11 @@ public:
 
 extern EnvironmentManager environment_manager;
 
-#define NEW_REG_ REG_(environment_manager.get_temp_count())
+#define NEW_REG_ REG_(environment_manager.temp_count++)
+#define CUR_REG_ REG_(environment_manager.temp_count - 1)
 
 extern ofstream koopa_ofs;
 
 void init_lib();
+void print_array_type(const string& ident, const vector<int>& indices);
+void print_array(const string& ident, const vector<int>& indices, const vector<int>& values, int level, int& value_index, vector<int>& slices);

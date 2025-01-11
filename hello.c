@@ -1,6 +1,4 @@
-int a = 2;
-
 int main() {
-  a = 3;
-  return a;
+  int a[3] = {};
+  return 3;
 }

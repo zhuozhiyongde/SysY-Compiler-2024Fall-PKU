@@ -25,6 +25,7 @@
         "*.tcc": "cpp",
         "system_error": "cpp",
         "random": "c",
-        "new": "cpp"
+        "new": "cpp",
+        "istream": "cpp"
     }
 }

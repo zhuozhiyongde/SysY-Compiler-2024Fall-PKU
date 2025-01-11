@@ -6,6 +6,7 @@
 #include <fstream>
 #include <optional>
 #include <vector>
+#include <deque>
 #include <unordered_map>
 #include <cassert>
 #include <typeinfo>
@@ -66,13 +67,17 @@ public:
 class ConstDefAST : public BaseAST {
 public:
     string ident;
+    vector<unique_ptr<BaseAST>>* array_index;
     unique_ptr<BaseAST> value;
     Result print() const override;
 };
 
 class ConstInitValAST : public BaseAST {
 public:
-    unique_ptr<BaseAST> const_exp;
+    optional<unique_ptr<BaseAST>> const_exp;
+    optional<vector<unique_ptr<BaseAST>>> init_values;
+    void init(const vector<int>& indices, vector<int>& values);
+    Result print(const string& ident, const vector<int>& indices);
     Result print() const override;
 };
 
@@ -91,14 +96,17 @@ public:
 class VarDefAST : public BaseAST {
 public:
     string ident;
+    vector<unique_ptr<BaseAST>>* array_index;
     optional<unique_ptr<BaseAST>> value;
-    bool is_global;
     Result print() const override;
 };
 
 class InitValAST : public BaseAST {
 public:
-    unique_ptr<BaseAST> exp;
+    optional<unique_ptr<BaseAST>> exp;
+    optional<vector<unique_ptr<BaseAST>>> init_values;
+    void init(const vector<int>& indices, vector<int>& values);
+    Result print(const string& ident, const vector<int>& indices);
     Result print() const override;
 };
 
@@ -149,6 +157,7 @@ public:
 class LValAST : public BaseAST {
 public:
     string ident;
+    vector<unique_ptr<BaseAST>>* array_index;
     Result print() const override;
 };
 

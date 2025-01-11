@@ -142,3 +142,119 @@ void init_lib() {
     koopa_ofs << "decl @stoptime()" << endl;
     koopa_ofs << endl;
 }
+
+void print_array_type(const string& ident, const vector<int>& indices) {
+    if (environment_manager.is_global) {
+        koopa_ofs << "global @" << ident << " = alloc ";
+    }
+    else {
+        koopa_ofs << "\t@" << ident << " = alloc ";
+    }
+    for (int i = 0;i < indices.size();i++) {
+        koopa_ofs << "[";
+    }
+    koopa_ofs << "i32";
+    // 倒序
+    for (int i = indices.size() - 1;i >= 0;i--) {
+        koopa_ofs << ", " << indices[i] << "]";
+    }
+}
+
+/**
+ * 打印数组初始化值
+ * @param indices 数组维度
+ * @param values 初始化值
+ * @param level 当前维度
+ * @param value_index 当前值索引
+ */
+void print_array(const string& ident, const vector<int>& indices, const vector<int>& values, int level, int& value_index, vector<int>& slices) {
+    // 全局数组
+    if (environment_manager.is_global) {
+        if (value_index == 0) {
+            koopa_ofs << ", ";
+        }
+        if (level == indices.size() - 1) {
+            koopa_ofs << "{";
+            for (int i = 0;i < indices[level];i++) {
+                if (i != 0) {
+                    koopa_ofs << ", ";
+                }
+                if (value_index < values.size()) {
+                    koopa_ofs << values[value_index];
+                    value_index++;
+                }
+                else {
+                    koopa_ofs << "0";
+                }
+            }
+            koopa_ofs << "}";
+        }
+        else {
+            koopa_ofs << "{";
+            for (int i = 0;i < indices[level];i++) {
+                if (i != 0) {
+                    koopa_ofs << ", ";
+                }
+                print_array(ident, indices, values, level + 1, value_index, slices);
+            }
+            koopa_ofs << "}";
+        }
+    }
+    // 局部数组
+    else {
+        // 特判处理单维数组
+        if (indices.size() == 1) {
+            if (value_index == 0) {
+                koopa_ofs << endl;
+            }
+            for (int i = 0; i < indices[0]; i++) {
+                int item_ptr = environment_manager.get_temp_count();
+                koopa_ofs << "\t%" << item_ptr << " = getelemptr @" << ident << ", " << i << endl;
+                koopa_ofs << "\tstore " << values[value_index] << ", %" << item_ptr << endl;
+                value_index++;
+            }
+        }
+        // 最内层数组
+        else if (level == indices.size() - 1) {
+            int ptr = slices[level - 1];
+            for (int i = 0;i < indices[level];i++) {
+                int item_ptr = environment_manager.get_temp_count();
+                koopa_ofs << "\t%" << item_ptr << " = getelemptr %" << ptr << ", " << i << endl;
+                koopa_ofs << "\tstore " << values[value_index] << ", %" << item_ptr << endl;
+                value_index++;
+            }
+        }
+        // 非最内层数组
+        else {
+            // 顶级数组
+            if (level == 0) {
+                if (value_index == 0) {
+                    koopa_ofs << endl;
+                }
+                for (int i = 0;i < indices[level];i++) {
+                    int base = environment_manager.get_temp_count();
+                    koopa_ofs << "\t%" << base << " = getelemptr @" << ident << ", " << 0 << endl;
+                    slices.push_back(base);
+                    print_array(ident, indices, values, level + 1, value_index, slices);
+                    slices.pop_back();
+                }
+                return;
+            }
+            // 非顶级数组
+            else {
+                int step = 1;
+                for (int i = level + 1;i < indices.size();i++) {
+                    step *= indices[i];
+                }
+                for (int i = 0; i < indices[level];i++) {
+                    int cur = value_index % step;
+                    int ptr = environment_manager.get_temp_count();
+                    slices.push_back(ptr);
+                    koopa_ofs << "\t%" << ptr << " = getelemptr %" << slices[level - 1] << ", " << cur << endl;
+                    print_array(ident, indices, values, level + 1, value_index, slices);
+                    slices.pop_back();
+                }
+            }
+        }
+    }
+}

@@ -98,15 +98,95 @@ Result ConstDeclAST::print() const {
 Result ConstDefAST::print() const {
   // 在当前层级符号表中分配常量名
   string ident_with_suffix = local_symbol_table->assign(ident);
-  // 计算常量值
-  Result value_result = value->print();
-  // 在当前层级符号表中创建常量
-  local_symbol_table->create(ident_with_suffix, VAL_(value_result.value));
+  // 数组常量
+  if (array_index->size() > 0) {
+    vector<int> index_results;
+    for (auto& item : *array_index) {
+      Result index_result = item->print();
+      index_results.push_back(index_result.value);
+    }
+    // 输出类型声明
+    print_array_type(ident_with_suffix, index_results);
+    // 判断是否初始化
+    if (value) {
+      ((ConstInitValAST*)value.get())->print(ident_with_suffix, index_results);
+    }
+    else {
+      koopa_ofs << ", zeroinit" << endl;
+    }
+    // 在当前层级符号表中创建变量
+    local_symbol_table->create(ident_with_suffix, ARR_);
+    return Result();
+  }
+  // 全局 / 局部非数组常量
+  else {
+    // 计算常量值
+    Result value_result = value->print();
+    // 在当前层级符号表中创建常量
+    local_symbol_table->create(ident_with_suffix, VAL_(value_result.value));
+    return Result();
+  }
+}
+
+void ConstInitValAST::init(const vector<int>& indices, vector<int>& values) {
+  int indices_size = indices.size();
+  int product = 1;
+  deque<int> steps;
+  for (int i = indices_size - 1;i >= 0;i--) {
+    product *= indices[i];
+    steps.push_front(product);
+  }
+  int int_num = 0;
+  int step = steps.back();
+  for (auto& item : *init_values) {
+    auto it = (ConstInitValAST*)(item.get());
+    // 如果是整数
+    if (it->const_exp) {
+      int_num++;
+      Result res = it->print();
+      values.push_back(res.value);
+    }
+    // 如果是初始化列表
+    else if (it->init_values) {
+      // koopa_ofs << "\nin list:" << it->init_values->size() << endl;
+      // 从前到后遍历 step，看是否能整除
+      for (auto& step : steps) {
+        // 找到正确的 step
+        if (int_num % step == 0) {
+          it->init(indices, values);
+          int_num = values.size();
+          break;
+        }
+      }
+    }
+  }
+  if (int_num % step != 0) {
+    while (int_num % step != 0) {
+      values.push_back(0);
+      int_num++;
+    }
+  }
+}
+
+Result ConstInitValAST::print(const string& ident, const vector<int>& indices) {
+  vector<int> values;
+  init(indices, values);
+  int value_index = 0;
+  vector<int> slices;
+  print_array(ident, indices, values, 0, value_index, slices);
   return Result();
 }
 
 Result ConstInitValAST::print() const {
-  return const_exp->print();
+  if (const_exp) {
+    return (*const_exp)->print();
+  }
+  else {
+    for (auto& item : *init_values) {
+      item->print();
+    }
+  }
+  return Result();
 }
 
 Result ConstExpAST::print() const {
@@ -123,36 +203,120 @@ Result VarDeclAST::print() const {
 Result VarDefAST::print() const {
   // 在当前层级符号表中分配变量
   string ident_with_suffix = local_symbol_table->assign(ident);
-  if (environment_manager.is_global) {
-    // global @var = alloc i32, zeroinit
+  // 数组变量
+  if (array_index->size() > 0) {
+    // 准备数组索引
+    vector<int> index_results;
+    for (auto& item : *array_index) {
+      Result index_result = item->print();
+      index_results.push_back(index_result.value);
+    }
+    // 输出类型声明
+    print_array_type(ident_with_suffix, index_results);
+    // 判断是否初始化
     if (value) {
-      Result value_result = (*value)->print();
-      assert(value_result.type == Result::Type::IMM);
-      koopa_ofs << "global @" << ident_with_suffix << " = alloc i32, " << value_result << endl;
+      ((InitValAST*)(*value).get())->print(ident_with_suffix, index_results);
     }
     else {
-      koopa_ofs << "global @" << ident_with_suffix << " = alloc i32, zeroinit" << endl;
+      if (environment_manager.is_global) {
+        koopa_ofs << ", zeroinit" << endl;
+      }
+      else {
+        koopa_ofs << endl;
+      }
     }
+    // 在当前层级符号表中创建变量
+    local_symbol_table->create(ident_with_suffix, ARR_);
+    koopa_ofs << endl;
+    return Result();
   }
+  // 非数组变量
   else {
-    // 判断是否需要生成 alloc 指令
-    if (!environment_manager.is_symbol_allocated[ident_with_suffix]) {
-      koopa_ofs << "\t@" << ident_with_suffix << " = alloc i32" << endl;
-      environment_manager.is_symbol_allocated[ident_with_suffix] = true;
+    // 全局变量
+    if (environment_manager.is_global) {
+      // 判断是否初始化
+      if (value) {
+        Result value_result = (*value)->print();
+        assert(value_result.type == Result::Type::IMM);
+        koopa_ofs << "global @" << ident_with_suffix << " = alloc i32, " << value_result << endl;
+      }
+      else {
+        koopa_ofs << "global @" << ident_with_suffix << " = alloc i32, zeroinit" << endl;
+      }
     }
-    // 若初始值不为空，则生成 store 指令
-    if (value) {
-      Result value_result = (*value)->print();
-      koopa_ofs << "\tstore " << value_result << ", @" << ident_with_suffix << endl;
+    // 局部变量
+    else {
+      // 判断是否需要生成 alloc 指令
+      if (!environment_manager.is_symbol_allocated[ident_with_suffix]) {
+        koopa_ofs << "\t@" << ident_with_suffix << " = alloc i32" << endl;
+        environment_manager.is_symbol_allocated[ident_with_suffix] = true;
+      }
+      // 若初始值不为空，则生成 store 指令
+      if (value) {
+        Result value_result = (*value)->print();
+        koopa_ofs << "\tstore " << value_result << ", @" << ident_with_suffix << endl;
+      }
+    }
+    // 在当前层级符号表中创建变量
+    local_symbol_table->create(ident_with_suffix, VAR_);
+    return Result();
+  }
+}
+
+void InitValAST::init(const vector<int>& indices, vector<int>& values) {
+  int indices_size = indices.size();
+  int product = 1;
+  deque<int> steps;
+  for (int i = indices_size - 1;i >= 0;i--) {
+    product *= indices[i];
+    steps.push_front(product);
+  }
+  int int_num = 0;
+  int step = steps.back();
+  for (auto& item : *init_values) {
+    auto it = (InitValAST*)(item.get());
+    // 如果是整数
+    if (it->exp) {
+      int_num++;
+      Result res = it->print();
+      values.push_back(res.value);
+    }
+    // 如果是初始化列表
+    else if (it->init_values) {
+      // koopa_ofs << "\nin list:" << it->init_values->size() << endl;
+      // 从前到后遍历 step，看是否能整除
+      for (auto& step : steps) {
+        // 找到正确的 step
+        if (int_num % step == 0) {
+          it->init(indices, values);
+          int_num = values.size();
+          break;
+        }
+      }
     }
   }
-  // 在当前层级符号表中创建变量
-  local_symbol_table->create(ident_with_suffix, VAR_);
+  if (int_num % step != 0) {
+    while (int_num % step != 0) {
+      values.push_back(0);
+      int_num++;
+    }
+  }
+}
+
+Result InitValAST::print(const string& ident, const vector<int>& indices) {
+  vector<int> values;
+  init(indices, values);
+  int value_index = 0;
+  vector<int> slices;
+  print_array(ident, indices, values, 0, value_index, slices);
   return Result();
 }
 
 Result InitValAST::print() const {
-  return exp->print();
+  if (exp) {
+    return (*exp)->print();
+  }
+  return Result();
 }
 
 Result StmtIfAST::print() const {
@@ -235,14 +399,35 @@ Result StmtContinueAST::print() const {
 }
 
 Result StmtAssignAST::print() const {
+  auto l_val_ast = (LValAST*)l_val.get();
   // 获取变量名
-  auto ident = ((LValAST*)l_val.get())->ident;
+  auto ident = l_val_ast->ident;
   // 获取变量名在符号表中的位置，可能需要向上级符号表查找
   string ident_with_suffix = local_symbol_table->locate(ident);
   assert(local_symbol_table->exist(ident_with_suffix));
   // 计算表达式结果并存储到变量中
   Result exp_result = exp->print();
-  koopa_ofs << "\tstore " << exp_result << ", @" << ident_with_suffix << endl;
+  // 判断是否为数组类型
+  /*
+  %0 = getelemptr @arr3_2, 0
+  %1 = getelemptr %0, 2
+  %2 = getelemptr %1, 3 */
+  if (l_val_ast->array_index->size() > 0) {
+    for (int i = 0;i < l_val_ast->array_index->size();i++) {
+      auto index = (*l_val_ast->array_index)[i]->print();
+      auto prev_reg = CUR_REG_;
+      if (i == 0) {
+        koopa_ofs << "\t" << NEW_REG_ << " = getelemptr @" << ident_with_suffix << ", " << index << endl;
+      }
+      else {
+        koopa_ofs << "\t" << NEW_REG_ << " = getelemptr " << prev_reg << ", " << index << endl;
+      }
+    }
+    koopa_ofs << "\tstore " << exp_result << ", " << CUR_REG_ << endl;
+  }
+  else {
+    koopa_ofs << "\tstore " << exp_result << ", @" << ident_with_suffix << endl;
+  }
   return Result();
 }
 
@@ -286,6 +471,22 @@ Result LValAST::print() const {
   // 若变量是常量，则直接返回常量值
   else if (symbol.type == Symbol::Type::VAL) {
     return IMM_(symbol.value);
+  }
+  else if (symbol.type == Symbol::Type::ARR) {
+    // 准备数组索引
+    for (int i = 0;i < array_index->size();i++) {
+      auto index = (*array_index)[i]->print();
+      auto prev_reg = CUR_REG_;
+      if (i == 0) {
+        koopa_ofs << "\t" << NEW_REG_ << " = getelemptr @" << ident_with_suffix << ", " << index << endl;
+      }
+      else {
+        koopa_ofs << "\t" << NEW_REG_ << " = getelemptr " << prev_reg << ", " << index << endl;
+      }
+    }
+    auto prev_reg = CUR_REG_;
+    koopa_ofs << "\t" << NEW_REG_ << " = load " << prev_reg << endl;
+    return CUR_REG_;
   }
   else {
     assert(false);
