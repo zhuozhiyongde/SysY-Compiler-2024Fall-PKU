@@ -92,7 +92,6 @@ class VarDefAST : public BaseAST {
 public:
     string ident;
     optional<unique_ptr<BaseAST>> value;
-    bool is_global;
     Result print() const override;
 };
 
