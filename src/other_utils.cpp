@@ -95,3 +95,20 @@ string koopaRawSliceKindItemToString(int kind) {
         return "UNKNOWN_KIND";
     }
 }
+
+string koopaRawTypeTagToString(int tag) {
+    switch (tag) {
+    case koopa_raw_type_tag_t::KOOPA_RTT_INT32:
+        return "KOOPA_RTT_INT32";
+    case koopa_raw_type_tag_t::KOOPA_RTT_UNIT:
+        return "KOOPA_RTT_UNIT";
+    case koopa_raw_type_tag_t::KOOPA_RTT_ARRAY:
+        return "KOOPA_RTT_ARRAY";
+    case koopa_raw_type_tag_t::KOOPA_RTT_POINTER:
+        return "KOOPA_RTT_POINTER";
+    case koopa_raw_type_tag_t::KOOPA_RTT_FUNCTION:
+        return "KOOPA_RTT_FUNCTION";
+    default:
+        return "UNKNOWN_TAG";
+    }
+}

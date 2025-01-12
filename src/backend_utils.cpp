@@ -113,6 +113,10 @@ void Riscv::_slt(const string& rd, const string& rs1, const string& rs2) {
     riscv_ofs << "\tslt " << rd << ", " << rs1 << ", " << rs2 << endl;
 }
 
+void Riscv::_sll(const string& rd, const string& rs1, const string& rs2) {
+    riscv_ofs << "\tsll " << rd << ", " << rs1 << ", " << rs2 << endl;
+}
+
 void Riscv::_li(const string& rd, const int& imm) {
     riscv_ofs << "\tli " << rd << ", " << imm << endl;
 }

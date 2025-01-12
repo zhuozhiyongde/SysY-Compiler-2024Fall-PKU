@@ -53,6 +53,7 @@ void visit(const koopa_raw_function_t& func) {
     riscv._label(func->name + 1);
     int cnt = 0;
     int stack_args = 0;
+    int alloc_size = 0;
     bool has_call = false;
     for (size_t i = 0; i < func->bbs.len; ++i) {
         auto bb = reinterpret_cast<koopa_raw_basic_block_t>(func->bbs.buffer[i]);
@@ -69,6 +70,11 @@ void visit(const koopa_raw_function_t& func) {
                 stack_args = max(stack_args, args - 8);
                 has_call = true;
             }
+            // 如果是 alloc 指令，检查是否为数组
+            if (inst->kind.tag == KOOPA_RVT_ALLOC) {
+                int size = get_alloc_size(inst->ty->data.pointer.base);
+                alloc_size += size;
+            }
         }
     }
     // 如果函数体内有 call 指令，需要多分配一条 store 指令来存储 ra 寄存器
@@ -76,6 +82,7 @@ void visit(const koopa_raw_function_t& func) {
     // 额外分配压栈参数空间
     cnt += stack_args;
     cnt *= 4;
+    cnt += alloc_size;
     // 对齐到 16 的倍数
     cnt = (cnt + 15) / 16 * 16;
     // 检查是否超过 imm12 的限制
@@ -98,12 +105,43 @@ void visit(const koopa_raw_basic_block_t& bb) {
     riscv_ofs << bb->name + 1 << ":" << endl;
     visit(bb->insts);
 };
+
+int get_alloc_size(const koopa_raw_type_t ty) {
+    switch (ty->tag) {
+    case KOOPA_RTT_INT32:
+        return 4;
+    case KOOPA_RTT_ARRAY:
+        return ty->data.array.len * get_alloc_size(ty->data.array.base);
+    case KOOPA_RTT_UNIT:
+        return 0;
+    case KOOPA_RTT_POINTER:
+        return 4;
+    case KOOPA_RTT_FUNCTION:
+        return 0;
+    default:
+        printf("Invalid type: %s\n", koopaRawTypeTagToString(ty->tag).c_str());
+        assert(false);
+    }
+}
+
+
+void alloc(const koopa_raw_value_t& value) {
+    printf("alloc name: %s\n", value->name);
+    printf("alloc rtt: %s\n", koopaRawTypeTagToString(value->ty->tag).c_str());
+    int size = get_alloc_size(value->ty->data.pointer.base);
+    printf("alloc size: %d\n", size);
+    context.stack_map[value] = context.stack_used;
+    context.stack_used += size;
+}
+
 void visit(const koopa_raw_value_t& value) {
     // 根据指令类型判断后续需要如何访问
     const auto& kind = value->kind;
     // RVT: Raw Value Tag, 区分指令类型
     register_manager.reset();
     // printf("visit: %s\n", koopaRawValueTagToString(kind.tag).c_str());
+    // riscv_ofs << "---" << endl;
+    // riscv_ofs << "[" << koopaRawValueTagToString(kind.tag).c_str() << "]" << endl;
     switch (kind.tag) {
     case KOOPA_RVT_RETURN:
         // 访问 return 指令
@@ -116,11 +154,24 @@ void visit(const koopa_raw_value_t& value) {
         visit(kind.data.binary, value);
         break;
     case KOOPA_RVT_ALLOC:
-        // 访问 alloc 指令，不管
+        // 访问 alloc 指令
+        alloc(value);
         break;
     case KOOPA_RVT_GLOBAL_ALLOC:
         // 访问 global_alloc 指令
         visit(kind.data.global_alloc, value);
+        break;
+    case KOOPA_RVT_AGGREGATE:
+        // 访问 aggregate 指令
+        visit(kind.data.aggregate);
+        break;
+    case KOOPA_RVT_GET_PTR:
+        // 访问 get_ptr 指令
+        visit(kind.data.get_ptr, value);
+        break;
+    case KOOPA_RVT_GET_ELEM_PTR:
+        // 访问 get_elem_ptr 指令
+        visit(kind.data.get_elem_ptr, value);
         break;
     case KOOPA_RVT_STORE:
         // 访问 store 指令
@@ -165,11 +216,105 @@ void visit(const koopa_raw_global_alloc_t& global_alloc, const koopa_raw_value_t
         riscv._word(init->kind.data.integer.value);
         break;
     case KOOPA_RVT_ZERO_INIT:
-        riscv._zero(4);
+        riscv._zero(get_alloc_size(init->ty));
+        break;
+    case KOOPA_RVT_AGGREGATE:
+        visit(init->kind.data.aggregate);
+        break;
+    default:
+        printf("Invalid global_alloc init: %s\n", koopaRawValueTagToString(init->kind.tag).c_str());
+        assert(false);
+    }
+}
+
+void visit(const koopa_raw_aggregate_t& aggregate) {
+    // 访问 aggregate 指令
+    for (int i = 0; i < aggregate.elems.len; i++) {
+        auto elem = reinterpret_cast<koopa_raw_value_t>(aggregate.elems.buffer[i]);
+        if (elem->kind.tag == KOOPA_RVT_INTEGER) {
+            riscv._word(elem->kind.data.integer.value);
+        }
+        else {
+            visit(elem);
+        }
+    }
+}
+
+void visit(const koopa_raw_get_ptr_t& get_ptr, const koopa_raw_value_t& value) {
+    // 访问 get_ptr 指令
+    printf("get_ptr src: %s\n", koopaRawValueTagToString(get_ptr.src->kind.tag).c_str());
+    printf("get_ptr index: %s\n", koopaRawValueTagToString(get_ptr.index->kind.tag).c_str());
+    // riscv_ofs << "get_ptr src: " << koopaRawValueTagToString(get_ptr.src->kind.tag).c_str() << endl;
+    // riscv_ofs << "get_ptr index: " << koopaRawValueTagToString(get_ptr.index->kind.tag).c_str() << endl;
+    // 获取栈偏移
+    auto offset = context.stack_map[get_ptr.src];
+    auto base = register_manager.new_reg();
+    switch (get_ptr.src->kind.tag) {
+    case KOOPA_RVT_LOAD:
+        riscv._lw(base, "sp", offset);
+        break;
+    case KOOPA_RVT_GLOBAL_ALLOC:
+        riscv._la(base, context_manager.get_global(get_ptr.src));
         break;
     default:
         assert(false);
     }
+    bool is_non_zero = register_manager.get_operand_reg(get_ptr.index);
+    if (is_non_zero) {
+        auto bias = register_manager.reg_map[get_ptr.index];
+        // riscv_ofs << "bias: " << bias << endl;
+        auto step = register_manager.tmp_reg();
+        // 要获取步长，就需要获取数组元素的类型
+        riscv._li(step, get_alloc_size(get_ptr.src->ty->data.pointer.base));
+        riscv._mul(bias, bias, step);
+        // 计算最终地址
+        riscv._add(base, base, bias);
+    }
+    riscv._sw(base, "sp", context.stack_used);
+    context.push(value, context.stack_used);
+    // riscv_ofs << "---" << endl;
+}
+
+void visit(const koopa_raw_get_elem_ptr_t& get_elem_ptr, const koopa_raw_value_t& value) {
+    // 访问 get_elem_ptr 指令
+    // 如果是栈上变量，且 dest 不在 stack_map 中（我们没处理过 alloc），则需要分配新的空间
+    printf("get_elem_ptr src: %s\n", koopaRawValueTagToString(get_elem_ptr.src->kind.tag).c_str());
+    printf("get_elem_ptr index: %s\n", koopaRawValueTagToString(get_elem_ptr.index->kind.tag).c_str());
+    // riscv_ofs << "get_elem_ptr src: " << koopaRawValueTagToString(get_elem_ptr.src->kind.tag).c_str() << endl;
+    // riscv_ofs << "get_elem_ptr index: " << koopaRawValueTagToString(get_elem_ptr.index->kind.tag).c_str() << endl;
+    // 获取栈偏移
+    auto offset = context.stack_map[get_elem_ptr.src];
+    auto base = register_manager.new_reg();
+    switch (get_elem_ptr.src->kind.tag) {
+    case KOOPA_RVT_GLOBAL_ALLOC:
+        riscv._la(base, context_manager.get_global(get_elem_ptr.src));
+        break;
+    case KOOPA_RVT_GET_ELEM_PTR:
+        riscv._lw(base, "sp", offset);
+        break;
+    case KOOPA_RVT_GET_PTR:
+        riscv._lw(base, "sp", offset);
+        break;
+    case KOOPA_RVT_ALLOC:
+        riscv._addi(base, "sp", offset);
+        break;
+    default:
+        assert(false);
+    }
+    bool is_non_zero = register_manager.get_operand_reg(get_elem_ptr.index);
+    if (is_non_zero) {
+        auto bias = register_manager.reg_map[get_elem_ptr.index];
+        // riscv_ofs << "bias: " << bias << endl;
+        auto step = register_manager.tmp_reg();
+        // 要获取步长，就需要获取数组元素的类型
+        riscv._li(step, get_alloc_size(get_elem_ptr.src->ty->data.pointer.base->data.array.base));
+        riscv._mul(bias, bias, step);
+        // 计算最终地址
+        riscv._add(base, base, bias);
+    }
+    riscv._sw(base, "sp", context.stack_used);
+    context.push(value, context.stack_used);
+    // riscv_ofs << "---" << endl;
 }
 
 void visit(const koopa_raw_call_t& call, const koopa_raw_value_t& value) {
@@ -182,8 +327,12 @@ void visit(const koopa_raw_call_t& call, const koopa_raw_value_t& value) {
         if (arg->kind.tag == KOOPA_RVT_INTEGER) {
             riscv._li(target, arg->kind.data.integer.value);
         }
+        else if (arg->kind.tag == KOOPA_RVT_GET_ELEM_PTR) {
+            riscv._lw(target, "sp", context.stack_map[arg]);
+        }
         // 为之前某操作的中间结果，实际上也必然为整数，但是需要先加载
         else {
+            // riscv_ofs << koopaRawValueTagToString(arg->kind.tag).c_str() << endl;
             auto tmp = register_manager.new_reg();
             riscv._lw(tmp, "sp", context.stack_map[arg]);
             riscv._mv(target, tmp);
@@ -194,9 +343,16 @@ void visit(const koopa_raw_call_t& call, const koopa_raw_value_t& value) {
     for (int i = 8; i < args; i++) {
         auto arg = reinterpret_cast<koopa_raw_value_t>(call.args.buffer[i]);
         int target = (i - 8) * 4;
+        // riscv_ofs << "arg: " << koopaRawValueTagToString(arg->kind.tag).c_str() << endl;
         if (arg->kind.tag == KOOPA_RVT_INTEGER) {
             auto tmp = register_manager.new_reg();
             riscv._li(tmp, arg->kind.data.integer.value);
+            riscv._sw(tmp, "sp", target);
+            register_manager.reset();
+        }
+        else if (arg->kind.tag == KOOPA_RVT_GET_ELEM_PTR) {
+            auto tmp = register_manager.new_reg();
+            riscv._lw(tmp, "sp", context.stack_map[arg]);
             riscv._sw(tmp, "sp", target);
             register_manager.reset();
         }
@@ -233,9 +389,19 @@ void visit(const koopa_raw_load_t& load, const koopa_raw_value_t& value) {
     auto reg = register_manager.new_reg();
     auto bias = context.stack_used;
     printf("load: %s\n", koopaRawValueTagToString(load.src->kind.tag).c_str());
+    // riscv_ofs << "load: " << koopaRawValueTagToString(load.src->kind.tag).c_str() << endl;
     // 如果是全局变量，需要先获取地址，再获取值
     if (load.src->kind.tag == KOOPA_RVT_GLOBAL_ALLOC) {
         riscv._la(reg, context_manager.get_global(load.src));
+        riscv._lw(reg, reg, 0);
+    }
+    // 如果是指针，再解引用一下
+    else if (load.src->kind.tag == KOOPA_RVT_GET_ELEM_PTR) {
+        riscv._lw(reg, "sp", context.stack_map[load.src]);
+        riscv._lw(reg, reg, 0);
+    }
+    else if (load.src->kind.tag == KOOPA_RVT_GET_PTR) {
+        riscv._lw(reg, "sp", context.stack_map[load.src]);
         riscv._lw(reg, reg, 0);
     }
     // 如果是栈上变量，直接获取值
@@ -244,6 +410,7 @@ void visit(const koopa_raw_load_t& load, const koopa_raw_value_t& value) {
     }
     context.push(value, bias);
     riscv._sw(reg, "sp", bias);
+    // riscv_ofs << "---" << endl;
 }
 
 void visit(const koopa_raw_store_t& store) {
@@ -255,14 +422,24 @@ void visit(const koopa_raw_store_t& store) {
         auto reg = register_manager.new_reg();
         riscv._la(reg, context_manager.get_global(store.dest));
         riscv._sw(register_manager.reg_map[store.value], reg, 0);
-        return;
     }
-    // 如果是栈上变量，且 dest 不在 stack_map 中（我们没处理过 alloc），则需要分配新的空间
-    if (context.stack_map.find(store.dest) == context.stack_map.end()) {
-        context.push(store.dest, context.stack_used);
+    // 如果是指针，再解引用一下
+    else if (store.dest->kind.tag == KOOPA_RVT_GET_ELEM_PTR) {
+        auto reg = register_manager.new_reg();
+        riscv._lw(reg, "sp", context.stack_map[store.dest]);
+        riscv._sw(register_manager.reg_map[store.value], reg, 0);
     }
-    assert(register_manager.reg_map[store.value] != "");
-    riscv._sw(register_manager.reg_map[store.value], "sp", context.stack_map[store.dest]);
+    else if (store.dest->kind.tag == KOOPA_RVT_GET_PTR) {
+        auto reg = register_manager.new_reg();
+        riscv._lw(reg, "sp", context.stack_map[store.dest]);
+        riscv._sw(register_manager.reg_map[store.value], reg, 0);
+    }
+    // 如果是栈上变量，直接存储
+    else {
+        assert(register_manager.reg_map[store.value] != "");
+        riscv._sw(register_manager.reg_map[store.value], "sp", context.stack_map[store.dest]);
+    }
+    // riscv_ofs << "---" << endl;
 }
 
 void visit(const koopa_raw_return_t& ret) {

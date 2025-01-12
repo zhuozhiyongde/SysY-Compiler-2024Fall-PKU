@@ -47,6 +47,7 @@ public:
     void _rem(const string& rd, const string& rs1, const string& rs2);
     void _sgt(const string& rd, const string& rs1, const string& rs2);
     void _slt(const string& rd, const string& rs1, const string& rs2);
+    void _sll(const string& rd, const string& rs1, const string& rs2);
     // 访存
     void _lw(const string& rd, const string& base, const int& bias);
     void _sw(const string& rs1, const string& base, const int& bias);
