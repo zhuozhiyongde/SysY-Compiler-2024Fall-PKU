@@ -165,9 +165,12 @@ void ConstInitValAST::init(const vector<int>& indices, int*& arr, int& cur, int 
     product *= indices[i];
     steps.push_front(product);
   }
-  if (align == 0) {
-    align = steps.front();
-  }
+  // // 打印 steps
+  // koopa_ofs << "\nsteps: ";
+  // for (auto& item : steps) {
+  //   koopa_ofs << item << " ";
+  // }
+  // koopa_ofs << endl;
   for (auto& item : *init_values) {
     auto it = (ConstInitValAST*)(item.get());
     // 如果是整数
@@ -186,8 +189,7 @@ void ConstInitValAST::init(const vector<int>& indices, int*& arr, int& cur, int 
         }
         // 找到正确的 step
         if (cur % step == 0) {
-          align = step;
-          it->init(indices, arr, cur, align);
+          it->init(indices, arr, cur, step);
           break;
         }
       }
@@ -308,9 +310,6 @@ void InitValAST::init(const vector<int>& indices, int* arr, int& cur, int align)
     product *= indices[i];
     steps.push_front(product);
   }
-  if (align == 0) {
-    align = steps.front();
-  }
   for (auto& item : *init_values) {
     auto it = (InitValAST*)(item.get());
     // 如果是整数
@@ -330,8 +329,7 @@ void InitValAST::init(const vector<int>& indices, int* arr, int& cur, int align)
         // koopa_ofs << "here: " << step << " " << cur << endl;
         // 找到正确的 step
         if (cur % step == 0) {
-          align = step;
-          it->init(indices, arr, cur, align);
+          it->init(indices, arr, cur, step);
           break;
         }
       }
