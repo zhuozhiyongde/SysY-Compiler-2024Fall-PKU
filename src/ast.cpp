@@ -647,7 +647,12 @@ Result LExpWithOpAST::print() const {
       }
       else {
         Result rhs = right->print();
-        return rhs;
+        if (rhs.type == Result::Type::IMM) {
+          return IMM_(rhs.value != 0);
+        }
+        else {
+          return rhs;
+        }
       }
     }
     // 左侧不为立即数
@@ -690,7 +695,12 @@ Result LExpWithOpAST::print() const {
       }
       else {
         Result rhs = right->print();
-        return rhs;
+        if (rhs.type == Result::Type::IMM) {
+          return IMM_(rhs.value != 0);
+        }
+        else {
+          return rhs;
+        }
       }
     }
     // 左侧不为立即数
