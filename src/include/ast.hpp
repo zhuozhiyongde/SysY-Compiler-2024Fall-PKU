@@ -48,6 +48,8 @@ public:
 class FuncFParamAST : public BaseAST {
 public:
     string ident;
+    bool is_array;
+    vector<unique_ptr<BaseAST>>* array_index;
     void as_param() const;
     Result print() const override;
 };

@@ -21,17 +21,20 @@ public:
     enum class Type {
         VAR,
         VAL,
-        ARR
+        ARR,
+        PTR
     };
     Type type;
+    // 对于 ARR 和 PTR 类型，value 表示数组或指针的维度
     int value;
     Symbol() : type(Type::VAL), value(0) {}
     Symbol(Type type, int value = 0) : type(type), value(value) {}
 };
 
 #define VAR_ Symbol(Symbol::Type::VAR, 0)
-#define ARR_ Symbol(Symbol::Type::ARR, 0)
 #define VAL_(value) Symbol(Symbol::Type::VAL, value)
+#define ARR_(value) Symbol(Symbol::Type::ARR, value)
+#define PTR_(value) Symbol(Symbol::Type::PTR, value)
 
 /**
  * @brief 符号表类，管理变量名和符号，实现为单向链表
@@ -138,5 +141,6 @@ extern EnvironmentManager environment_manager;
 extern ofstream koopa_ofs;
 
 void init_lib();
+void format_array_type(const vector<int>& indices);
 void print_array_type(const string& ident, const vector<int>& indices);
 void print_array(const string& ident, const vector<int>& indices, int* array, int level, int& index, vector<int>& bases);

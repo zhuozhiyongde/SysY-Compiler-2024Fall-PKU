@@ -143,6 +143,22 @@ void init_lib() {
     koopa_ofs << endl;
 }
 
+void format_array_type(const vector<int>& indices) {
+    if (indices.empty()) {
+        koopa_ofs << "i32";
+    }
+    else {
+        for (int i = 0;i < indices.size();i++) {
+            koopa_ofs << "[";
+        }
+        koopa_ofs << "i32";
+        // 倒序
+        for (int i = indices.size() - 1;i >= 0;i--) {
+            koopa_ofs << ", " << indices[i] << "]";
+        }
+    }
+}
+
 void print_array_type(const string& ident, const vector<int>& indices) {
     if (environment_manager.is_global) {
         koopa_ofs << "global @" << ident << " = alloc ";
@@ -150,14 +166,7 @@ void print_array_type(const string& ident, const vector<int>& indices) {
     else {
         koopa_ofs << "\t@" << ident << " = alloc ";
     }
-    for (int i = 0;i < indices.size();i++) {
-        koopa_ofs << "[";
-    }
-    koopa_ofs << "i32";
-    // 倒序
-    for (int i = indices.size() - 1;i >= 0;i--) {
-        koopa_ofs << ", " << indices[i] << "]";
-    }
+    format_array_type(indices);
 }
 
 /**

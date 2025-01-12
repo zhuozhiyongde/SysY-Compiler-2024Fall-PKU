@@ -145,6 +145,14 @@ FuncFParam
     ast->ident = *unique_ptr<string>($2);
     $$ = ast;
   }
+  | INT IDENT '[' ']' ExtendArrayIndex {
+    auto ast = new FuncFParamAST();
+    ast->ident = *unique_ptr<string>($2);
+    ast->is_array = true;
+    vector<unique_ptr<BaseAST>> *vec = $5;
+    ast->array_index = vec;
+    $$ = ast;
+  }
   ;
 
 Block

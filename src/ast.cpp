@@ -20,6 +20,7 @@ Result FuncDefAST::print() const {
   local_symbol_table->set_parent(parent_symbol_table);
   // 清空 is_symbol_allocated
   environment_manager.is_symbol_allocated.clear();
+  environment_manager.temp_count = 0;
   koopa_ofs << "fun @" << ident;
   koopa_ofs << "(";
   if (func_f_params) {
@@ -59,7 +60,17 @@ Result FuncDefAST::print() const {
 }
 
 void FuncFParamAST::as_param() const {
-  koopa_ofs << "@" << ident << ": i32";
+  if (is_array) {
+    koopa_ofs << "@" << ident << ": *";
+    vector<int> indices;
+    for (auto& item : *array_index) {
+      indices.push_back(item->print().value);
+    }
+    format_array_type(indices);
+  }
+  else {
+    koopa_ofs << "@" << ident << ": i32";
+  }
 }
 
 Result FuncFParamAST::print() const {
@@ -67,10 +78,23 @@ Result FuncFParamAST::print() const {
   // store @x, %x
   // 在当前层级符号表中创建变量
   string ident_with_suffix = local_symbol_table->assign(ident);
-  koopa_ofs << "\t@" << ident_with_suffix << " = alloc i32" << endl;
+  if (is_array) {
+    koopa_ofs << "\t@" << ident_with_suffix << " = alloc *";
+    vector<int> indices;
+    for (auto& item : *array_index) {
+      indices.push_back(item->print().value);
+    }
+    format_array_type(indices);
+    koopa_ofs << endl;
+    // 默认有一个 []，所以需要 +1
+    local_symbol_table->create(ident_with_suffix, PTR_(array_index->size() + 1));
+  }
+  else {
+    koopa_ofs << "\t@" << ident_with_suffix << " = alloc i32" << endl;
+    local_symbol_table->create(ident_with_suffix, VAR_);
+  }
   koopa_ofs << "\tstore @" << ident << ", @" << ident_with_suffix << endl;
   // 在当前层级符号表中创建变量
-  local_symbol_table->create(ident_with_suffix, VAR_);
   return Result();
 }
 
@@ -120,7 +144,7 @@ Result ConstDefAST::print() const {
       }
     }
     // 在当前层级符号表中创建变量
-    local_symbol_table->create(ident_with_suffix, ARR_);
+    local_symbol_table->create(ident_with_suffix, ARR_(array_index->size()));
     return Result();
   }
   // 全局 / 局部非数组常量
@@ -240,7 +264,7 @@ Result VarDefAST::print() const {
       }
     }
     // 在当前层级符号表中创建变量
-    local_symbol_table->create(ident_with_suffix, ARR_);
+    local_symbol_table->create(ident_with_suffix, ARR_(array_index->size()));
     return Result();
   }
   // 非数组变量
@@ -434,6 +458,8 @@ Result StmtAssignAST::print() const {
   // 获取变量名在符号表中的位置，可能需要向上级符号表查找
   string ident_with_suffix = local_symbol_table->locate(ident);
   assert(local_symbol_table->exist(ident_with_suffix));
+  // 获取变量
+  auto symbol = local_symbol_table->read(ident_with_suffix);
   // 计算表达式结果并存储到变量中
   Result exp_result = exp->print();
   // 判断是否为数组类型
@@ -442,17 +468,33 @@ Result StmtAssignAST::print() const {
   %1 = getelemptr %0, 2
   %2 = getelemptr %1, 3 */
   if (l_val_ast->array_index->size() > 0) {
-    for (int i = 0;i < l_val_ast->array_index->size();i++) {
-      auto index = (*l_val_ast->array_index)[i]->print();
-      auto prev_reg = CUR_REG_;
-      if (i == 0) {
-        koopa_ofs << "\t" << NEW_REG_ << " = getelemptr @" << ident_with_suffix << ", " << index << endl;
+    if (symbol.type == Symbol::Type::ARR) {
+      for (int i = 0;i < l_val_ast->array_index->size();i++) {
+        auto prev_reg = CUR_REG_;
+        auto index = (*l_val_ast->array_index)[i]->print();
+        if (i == 0) {
+          koopa_ofs << "\t" << NEW_REG_ << " = getelemptr @" << ident_with_suffix << ", " << index << endl;
+        }
+        else {
+          koopa_ofs << "\t" << NEW_REG_ << " = getelemptr " << prev_reg << ", " << index << endl;
+        }
       }
-      else {
-        koopa_ofs << "\t" << NEW_REG_ << " = getelemptr " << prev_reg << ", " << index << endl;
-      }
+      koopa_ofs << "\tstore " << exp_result << ", " << CUR_REG_ << endl;
     }
-    koopa_ofs << "\tstore " << exp_result << ", " << CUR_REG_ << endl;
+    else if (symbol.type == Symbol::Type::PTR) {
+      koopa_ofs << "\t" << NEW_REG_ << " = load @" << ident_with_suffix << endl;
+      for (int i = 0;i < l_val_ast->array_index->size();i++) {
+        auto prev_reg = CUR_REG_;
+        auto index = (*l_val_ast->array_index)[i]->print();
+        if (i == 0) {
+          koopa_ofs << "\t" << NEW_REG_ << " = getptr " << prev_reg << ", " << index << endl;
+        }
+        else {
+          koopa_ofs << "\t" << NEW_REG_ << " = getelemptr " << prev_reg << ", " << index << endl;
+        }
+      }
+      koopa_ofs << "\tstore " << exp_result << ", " << CUR_REG_ << endl;
+    }
   }
   else {
     koopa_ofs << "\tstore " << exp_result << ", @" << ident_with_suffix << endl;
@@ -507,7 +549,16 @@ Result LValAST::print() const {
     for (auto& item : *array_index) {
       indices.push_back(item->print());
     }
+    // 打印数组索引
+    // koopa_ofs << "indices: ";
+    // for (auto& item : indices) {
+    //   koopa_ofs << item << " ";
+    // }
+    // koopa_ofs << endl;
+    // 获取数组维度
+    int set_dims = 0;
     for (int i = 0;i < indices.size();i++) {
+      set_dims += 1;
       auto prev_reg = CUR_REG_;
       if (i == 0) {
         koopa_ofs << "\t" << NEW_REG_ << " = getelemptr @" << ident_with_suffix << ", " << indices[i] << endl;
@@ -517,7 +568,47 @@ Result LValAST::print() const {
       }
     }
     auto prev_reg = CUR_REG_;
-    koopa_ofs << "\t" << NEW_REG_ << " = load " << prev_reg << endl;
+    // koopa_ofs << "set_dims: " << set_dims << ", symbol.value: " << symbol.value << endl;
+    if (set_dims == symbol.value) {
+      koopa_ofs << "\t" << NEW_REG_ << " = load " << prev_reg << endl;
+    }
+    // 处理完全没指定的情况
+    else if (set_dims == 0) {
+      koopa_ofs << "\t" << NEW_REG_ << " = getelemptr @" << ident_with_suffix << ", 0" << endl;
+    }
+    else {
+      koopa_ofs << "\t" << NEW_REG_ << " = getelemptr " << prev_reg << ", 0" << endl;
+    }
+    return CUR_REG_;
+  }
+  else if (symbol.type == Symbol::Type::PTR) {
+    // 准备数组索引
+    vector<Result> indices;
+    for (auto& item : *array_index) {
+      indices.push_back(item->print());
+    }
+    // 获取数组维度
+    int set_dims = 0;
+    koopa_ofs << "\t" << NEW_REG_ << " = load @" << ident_with_suffix << endl;
+    for (int i = 0;i < indices.size();i++) {
+      set_dims += 1;
+      auto prev_reg = CUR_REG_;
+      if (i == 0) {
+        koopa_ofs << "\t" << NEW_REG_ << " = getptr " << prev_reg << ", " << indices[i] << endl;
+      }
+      else {
+        koopa_ofs << "\t" << NEW_REG_ << " = getelemptr " << prev_reg << ", " << indices[i] << endl;
+      }
+    }
+    auto prev_reg = CUR_REG_;
+    // koopa_ofs << "set_dims: " << set_dims << ", symbol.value: " << symbol.value << endl;
+    if (set_dims == symbol.value) {
+      koopa_ofs << "\t" << NEW_REG_ << " = load " << prev_reg << endl;
+    }
+    else if (set_dims != 0) {
+      koopa_ofs << "\t" << NEW_REG_ << " = getelemptr " << prev_reg << ", 0" << endl;
+    }
+    // 对于完全没指定的情况，前面最开始使用的 load 指令就是结果了
     return CUR_REG_;
   }
   else {
