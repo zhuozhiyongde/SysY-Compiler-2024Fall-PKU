@@ -171,31 +171,39 @@ void ConstInitValAST::init(const vector<int>& indices, int*& arr, int& cur, int 
   //   koopa_ofs << item << " ";
   // }
   // koopa_ofs << endl;
-  for (auto& item : *init_values) {
-    auto it = (ConstInitValAST*)(item.get());
-    // 如果是整数
-    if (it->const_exp) {
-      Result res = it->print();
-      arr[cur++] = res.value;
-    }
-    // 如果是初始化列表
-    else if (it->init_values) {
-      // 从前到后遍历 step，看是否能整除
-      bool is_first = true;
-      for (auto& step : steps) {
-        if (cur == 0 && is_first) {
-          is_first = false;
-          continue;
-        }
-        // 找到正确的 step
-        if (cur % step == 0) {
-          it->init(indices, arr, cur, step);
-          break;
+
+  // 判断 init_values 是否为空
+  if (init_values->empty()) {
+    arr[cur++] = 0;
+  }
+  else {
+    for (auto& item : *init_values) {
+      auto it = (ConstInitValAST*)(item.get());
+      // 如果是整数
+      if (it->const_exp) {
+        Result res = it->print();
+        arr[cur++] = res.value;
+      }
+      // 如果是初始化列表
+      else if (it->init_values) {
+        // 从前到后遍历 step，看是否能整除
+        bool is_first = true;
+        for (auto& step : steps) {
+          if (cur == 0 && is_first) {
+            is_first = false;
+            continue;
+          }
+          // 找到正确的 step
+          if (cur % step == 0) {
+            it->init(indices, arr, cur, step);
+            break;
+          }
         }
       }
     }
   }
   // 对齐到 align
+  // koopa_ofs << "\nalign: " << align << endl;
   while (cur % align != 0) {
     arr[cur++] = 0;
   }
@@ -310,38 +318,39 @@ void InitValAST::init(const vector<int>& indices, int* arr, int& cur, int align)
     product *= indices[i];
     steps.push_front(product);
   }
-  for (auto& item : *init_values) {
-    auto it = (InitValAST*)(item.get());
-    // 如果是整数
-    if (it->exp) {
-      Result res = it->print();
-      arr[cur++] = res.value;
-    }
-    // 如果是初始化列表
-    else if (it->init_values) {
-      // 从前到后遍历 step，看是否能整除
-      bool is_first = true;
-      for (auto& step : steps) {
-        if (cur == 0 && is_first) {
-          is_first = false;
-          continue;
-        }
-        // koopa_ofs << "here: " << step << " " << cur << endl;
-        // 找到正确的 step
-        if (cur % step == 0) {
-          it->init(indices, arr, cur, step);
-          break;
+  // 判断 init_values 是否为空
+  if (init_values->empty()) {
+    arr[cur++] = 0;
+  }
+  else {
+    for (auto& item : *init_values) {
+      auto it = (InitValAST*)(item.get());
+      // 如果是整数
+      if (it->exp) {
+        Result res = it->print();
+        arr[cur++] = res.value;
+      }
+      // 如果是初始化列表
+      else if (it->init_values) {
+        // 从前到后遍历 step，看是否能整除
+        bool is_first = true;
+        for (auto& step : steps) {
+          if (cur == 0 && is_first) {
+            is_first = false;
+            continue;
+          }
+          // koopa_ofs << "here: " << step << " " << cur << endl;
+          // 找到正确的 step
+          if (cur % step == 0) {
+            it->init(indices, arr, cur, step);
+            break;
+          }
         }
       }
     }
   }
-  // // 打印 array
-  // koopa_ofs << "array: ";
-  // for (int i = 0;i < product;i++) {
-  //   koopa_ofs << arr[i] << " ";
-  // }
-  // koopa_ofs << endl;
   // 对齐到 align
+  // koopa_ofs << "\nalign: " << align << endl;
   while (cur % align != 0) {
     arr[cur++] = 0;
   }

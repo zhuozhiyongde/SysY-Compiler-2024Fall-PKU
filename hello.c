@@ -1,4 +1,4 @@
-const int buf[2][10][4] = { 1,2,3,4,{1},{} };
+const int buf[3][3][1] = { 1,{},2 };
 
 int main() {
   return 33;
