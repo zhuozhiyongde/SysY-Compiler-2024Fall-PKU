@@ -76,7 +76,7 @@ class ConstInitValAST : public BaseAST {
 public:
     optional<unique_ptr<BaseAST>> const_exp;
     optional<vector<unique_ptr<BaseAST>>> init_values;
-    void init(const vector<int>& indices, vector<int>& values);
+    void init(const vector<int>& indices, int*& arr, int& cur, int align);
     Result print(const string& ident, const vector<int>& indices);
     Result print() const override;
 };
@@ -105,7 +105,7 @@ class InitValAST : public BaseAST {
 public:
     optional<unique_ptr<BaseAST>> exp;
     optional<vector<unique_ptr<BaseAST>>> init_values;
-    void init(const vector<int>& indices, vector<int>& values);
+    void init(const vector<int>& indices, int* arr, int& cur, int align);
     Result print(const string& ident, const vector<int>& indices);
     Result print() const override;
 };

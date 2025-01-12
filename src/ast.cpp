@@ -112,7 +112,12 @@ Result ConstDefAST::print() const {
       ((ConstInitValAST*)value.get())->print(ident_with_suffix, index_results);
     }
     else {
-      koopa_ofs << ", zeroinit" << endl;
+      if (environment_manager.is_global) {
+        koopa_ofs << ", zeroinit" << endl;
+      }
+      else {
+        koopa_ofs << endl;
+      }
     }
     // 在当前层级符号表中创建变量
     local_symbol_table->create(ident_with_suffix, ARR_);
@@ -128,7 +133,7 @@ Result ConstDefAST::print() const {
   }
 }
 
-void ConstInitValAST::init(const vector<int>& indices, vector<int>& values) {
+void ConstInitValAST::init(const vector<int>& indices, int*& arr, int& cur, int align) {
   int indices_size = indices.size();
   int product = 1;
   deque<int> steps;
@@ -136,44 +141,53 @@ void ConstInitValAST::init(const vector<int>& indices, vector<int>& values) {
     product *= indices[i];
     steps.push_front(product);
   }
-  int int_num = 0;
-  int step = steps.back();
+  if (align == 0) {
+    align = steps.front();
+  }
   for (auto& item : *init_values) {
     auto it = (ConstInitValAST*)(item.get());
     // 如果是整数
     if (it->const_exp) {
-      int_num++;
       Result res = it->print();
-      values.push_back(res.value);
+      arr[cur++] = res.value;
     }
     // 如果是初始化列表
     else if (it->init_values) {
-      // koopa_ofs << "\nin list:" << it->init_values->size() << endl;
       // 从前到后遍历 step，看是否能整除
+      bool is_first = true;
       for (auto& step : steps) {
+        if (cur == 0 && is_first) {
+          is_first = false;
+          continue;
+        }
         // 找到正确的 step
-        if (int_num % step == 0) {
-          it->init(indices, values);
-          int_num = values.size();
+        if (cur % step == 0) {
+          align = step;
+          it->init(indices, arr, cur, align);
           break;
         }
       }
     }
   }
-  if (int_num % step != 0) {
-    while (int_num % step != 0) {
-      values.push_back(0);
-      int_num++;
-    }
+  // 对齐到 align
+  while (cur % align != 0) {
+    arr[cur++] = 0;
   }
 }
 
 Result ConstInitValAST::print(const string& ident, const vector<int>& indices) {
-  vector<int> values;
-  init(indices, values);
-  int value_index = 0;
-  vector<int> slices;
-  print_array(ident, indices, values, 0, value_index, slices);
+  int total = 1;
+  for (auto& item : indices) {
+    total *= item;
+  }
+  int* array = new int[total];
+  int cur = 0;
+  init(indices, array, cur, total);
+  int index = 0;
+  vector<int> bases;
+  bases.push_back(-1);
+  print_array(ident, indices, array, 0, index, bases);
+  delete[] array;
   return Result();
 }
 
@@ -227,7 +241,6 @@ Result VarDefAST::print() const {
     }
     // 在当前层级符号表中创建变量
     local_symbol_table->create(ident_with_suffix, ARR_);
-    koopa_ofs << endl;
     return Result();
   }
   // 非数组变量
@@ -263,7 +276,7 @@ Result VarDefAST::print() const {
   }
 }
 
-void InitValAST::init(const vector<int>& indices, vector<int>& values) {
+void InitValAST::init(const vector<int>& indices, int* arr, int& cur, int align) {
   int indices_size = indices.size();
   int product = 1;
   deque<int> steps;
@@ -271,44 +284,60 @@ void InitValAST::init(const vector<int>& indices, vector<int>& values) {
     product *= indices[i];
     steps.push_front(product);
   }
-  int int_num = 0;
-  int step = steps.back();
+  if (align == 0) {
+    align = steps.front();
+  }
   for (auto& item : *init_values) {
     auto it = (InitValAST*)(item.get());
     // 如果是整数
     if (it->exp) {
-      int_num++;
       Result res = it->print();
-      values.push_back(res.value);
+      arr[cur++] = res.value;
     }
     // 如果是初始化列表
     else if (it->init_values) {
-      // koopa_ofs << "\nin list:" << it->init_values->size() << endl;
       // 从前到后遍历 step，看是否能整除
+      bool is_first = true;
       for (auto& step : steps) {
+        if (cur == 0 && is_first) {
+          is_first = false;
+          continue;
+        }
+        // koopa_ofs << "here: " << step << " " << cur << endl;
         // 找到正确的 step
-        if (int_num % step == 0) {
-          it->init(indices, values);
-          int_num = values.size();
+        if (cur % step == 0) {
+          align = step;
+          it->init(indices, arr, cur, align);
           break;
         }
       }
     }
   }
-  if (int_num % step != 0) {
-    while (int_num % step != 0) {
-      values.push_back(0);
-      int_num++;
-    }
+  // // 打印 array
+  // koopa_ofs << "array: ";
+  // for (int i = 0;i < product;i++) {
+  //   koopa_ofs << arr[i] << " ";
+  // }
+  // koopa_ofs << endl;
+  // 对齐到 align
+  while (cur % align != 0) {
+    arr[cur++] = 0;
   }
 }
 
 Result InitValAST::print(const string& ident, const vector<int>& indices) {
-  vector<int> values;
-  init(indices, values);
-  int value_index = 0;
-  vector<int> slices;
-  print_array(ident, indices, values, 0, value_index, slices);
+  int total = 1;
+  for (auto& item : indices) {
+    total *= item;
+  }
+  int* array = new int[total];
+  int cur = 0;
+  init(indices, array, cur, total);
+  int index = 0;
+  vector<int> bases;
+  bases.push_back(-1);
+  print_array(ident, indices, array, 0, index, bases);
+  delete[] array;
   return Result();
 }
 
@@ -474,14 +503,17 @@ Result LValAST::print() const {
   }
   else if (symbol.type == Symbol::Type::ARR) {
     // 准备数组索引
-    for (int i = 0;i < array_index->size();i++) {
-      auto index = (*array_index)[i]->print();
+    vector<Result> indices;
+    for (auto& item : *array_index) {
+      indices.push_back(item->print());
+    }
+    for (int i = 0;i < indices.size();i++) {
       auto prev_reg = CUR_REG_;
       if (i == 0) {
-        koopa_ofs << "\t" << NEW_REG_ << " = getelemptr @" << ident_with_suffix << ", " << index << endl;
+        koopa_ofs << "\t" << NEW_REG_ << " = getelemptr @" << ident_with_suffix << ", " << indices[i] << endl;
       }
       else {
-        koopa_ofs << "\t" << NEW_REG_ << " = getelemptr " << prev_reg << ", " << index << endl;
+        koopa_ofs << "\t" << NEW_REG_ << " = getelemptr " << prev_reg << ", " << indices[i] << endl;
       }
     }
     auto prev_reg = CUR_REG_;

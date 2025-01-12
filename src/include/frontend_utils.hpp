@@ -139,4 +139,4 @@ extern ofstream koopa_ofs;
 
 void init_lib();
 void print_array_type(const string& ident, const vector<int>& indices);
-void print_array(const string& ident, const vector<int>& indices, const vector<int>& values, int level, int& value_index, vector<int>& slices);
+void print_array(const string& ident, const vector<int>& indices, int* array, int level, int& index, vector<int>& bases);

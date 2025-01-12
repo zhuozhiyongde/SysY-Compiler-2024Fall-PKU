@@ -162,15 +162,17 @@ void print_array_type(const string& ident, const vector<int>& indices) {
 
 /**
  * 打印数组初始化值
+ * @param ident 数组名
  * @param indices 数组维度
- * @param values 初始化值
+ * @param array 初始化值
  * @param level 当前维度
- * @param value_index 当前值索引
+ * @param index 当前值索引
+ * @param bases 基址
  */
-void print_array(const string& ident, const vector<int>& indices, const vector<int>& values, int level, int& value_index, vector<int>& slices) {
+void print_array(const string& ident, const vector<int>& indices, int* array, int level, int& index, vector<int>& bases) {
     // 全局数组
     if (environment_manager.is_global) {
-        if (value_index == 0) {
+        if (index == 0 && level == 0) {
             koopa_ofs << ", ";
         }
         if (level == indices.size() - 1) {
@@ -179,13 +181,8 @@ void print_array(const string& ident, const vector<int>& indices, const vector<i
                 if (i != 0) {
                     koopa_ofs << ", ";
                 }
-                if (value_index < values.size()) {
-                    koopa_ofs << values[value_index];
-                    value_index++;
-                }
-                else {
-                    koopa_ofs << "0";
-                }
+                koopa_ofs << array[index];
+                index++;
             }
             koopa_ofs << "}";
         }
@@ -195,65 +192,45 @@ void print_array(const string& ident, const vector<int>& indices, const vector<i
                 if (i != 0) {
                     koopa_ofs << ", ";
                 }
-                print_array(ident, indices, values, level + 1, value_index, slices);
+                print_array(ident, indices, array, level + 1, index, bases);
             }
             koopa_ofs << "}";
         }
     }
     // 局部数组
     else {
-        // 特判处理单维数组
-        if (indices.size() == 1) {
-            if (value_index == 0) {
-                koopa_ofs << endl;
-            }
-            for (int i = 0; i < indices[0]; i++) {
-                int item_ptr = environment_manager.get_temp_count();
-                koopa_ofs << "\t%" << item_ptr << " = getelemptr @" << ident << ", " << i << endl;
-                koopa_ofs << "\tstore " << values[value_index] << ", %" << item_ptr << endl;
-                value_index++;
-            }
+        if (index == 0 && level == 0) {
+            koopa_ofs << endl;
         }
         // 最内层数组
-        else if (level == indices.size() - 1) {
-            int ptr = slices[level - 1];
+        if (level == indices.size() - 1) {
+            int base = bases.back();
             for (int i = 0;i < indices[level];i++) {
-                int item_ptr = environment_manager.get_temp_count();
-                koopa_ofs << "\t%" << item_ptr << " = getelemptr %" << ptr << ", " << i << endl;
-                koopa_ofs << "\tstore " << values[value_index] << ", %" << item_ptr << endl;
-                value_index++;
+                int ptr = environment_manager.get_temp_count();
+                if (base == -1) {
+                    koopa_ofs << "\t%" << ptr << " = getelemptr @" << ident << ", " << i << endl;
+                }
+                else {
+                    koopa_ofs << "\t%" << ptr << " = getelemptr %" << base << ", " << i << endl;
+                }
+                koopa_ofs << "\tstore " << array[index] << ", %" << ptr << endl;
+                index++;
             }
         }
         // 非最内层数组
         else {
-            // 顶级数组
-            if (level == 0) {
-                if (value_index == 0) {
-                    koopa_ofs << endl;
+            int base = bases.back();
+            for (int i = 0;i < indices[level];i++) {
+                int ptr = environment_manager.get_temp_count();
+                if (base == -1) {
+                    koopa_ofs << "\t%" << ptr << " = getelemptr @" << ident << ", " << i << endl;
                 }
-                for (int i = 0;i < indices[level];i++) {
-                    int base = environment_manager.get_temp_count();
-                    koopa_ofs << "\t%" << base << " = getelemptr @" << ident << ", " << 0 << endl;
-                    slices.push_back(base);
-                    print_array(ident, indices, values, level + 1, value_index, slices);
-                    slices.pop_back();
+                else {
+                    koopa_ofs << "\t%" << ptr << " = getelemptr %" << base << ", " << i << endl;
                 }
-                return;
-            }
-            // 非顶级数组
-            else {
-                int step = 1;
-                for (int i = level + 1;i < indices.size();i++) {
-                    step *= indices[i];
-                }
-                for (int i = 0; i < indices[level];i++) {
-                    int cur = value_index % step;
-                    int ptr = environment_manager.get_temp_count();
-                    slices.push_back(ptr);
-                    koopa_ofs << "\t%" << ptr << " = getelemptr %" << slices[level - 1] << ", " << cur << endl;
-                    print_array(ident, indices, values, level + 1, value_index, slices);
-                    slices.pop_back();
-                }
+                bases.push_back(ptr);
+                print_array(ident, indices, array, level + 1, index, bases);
+                bases.pop_back();
             }
         }
     }

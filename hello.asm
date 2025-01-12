@@ -7,66 +7,94 @@ decl @putarray(i32, *i32)
 decl @starttime()
 decl @stoptime()
 
-
+global @ga_0 = alloc [i32, 10], zeroinit
+global @gb_0 = alloc [[i32, 3], 2], {{5, 6, 7}, {8, 0, 0}}
 fun @main(): i32 {
 %main_entry:
-	@b_2 = alloc [i32, 4]
+	@a_2 = alloc [i32, 10]
+	@b_2 = alloc [[i32, 3], 2]
 	%0 = getelemptr @b_2, 0
-	store 0, %0
-	%1 = getelemptr @b_2, 1
+	%1 = getelemptr %0, 0
 	store 1, %1
-	%2 = getelemptr @b_2, 2
-	store 0, %2
-	%3 = getelemptr @b_2, 3
-	store 0, %3
-
-	@c_2 = alloc [i32, 7]
-	%4 = getelemptr @c_2, 0
-	store 2, %4
-	%5 = getelemptr @c_2, 1
-	store 8, %5
-	%6 = getelemptr @c_2, 2
-	store 6, %6
-	%7 = getelemptr @c_2, 3
-	store 3, %7
-	%8 = getelemptr @c_2, 4
-	store 9, %8
-	%9 = getelemptr @c_2, 5
-	store 1, %9
-	%10 = getelemptr @c_2, 6
-	store 5, %10
-
-	@d_2 = alloc [i32, 11]
-
-	@e_2 = alloc [i32, 2]
-	%11 = getelemptr @e_2, 0
-	store 22, %11
-	%12 = getelemptr @e_2, 1
-	store 33, %12
-
-	@f_2 = alloc [i32, 6]
-
-	@g_2 = alloc [i32, 9]
-	%13 = getelemptr @g_2, 0
-	store 85, %13
-	%14 = getelemptr @g_2, 1
-	store 0, %14
-	%15 = getelemptr @g_2, 2
-	store 1, %15
-	%16 = getelemptr @g_2, 3
-	store 29, %16
-	%17 = getelemptr @g_2, 4
-	store 0, %17
-	%18 = getelemptr @g_2, 5
-	store 0, %18
-	%19 = getelemptr @g_2, 6
-	store 0, %19
-	%20 = getelemptr @g_2, 7
-	store 0, %20
-	%21 = getelemptr @g_2, 8
-	store 0, %21
-
-	ret 3
+	%2 = getelemptr %0, 1
+	store 2, %2
+	%3 = getelemptr %0, 2
+	store 3, %3
+	%4 = getelemptr @b_2, 1
+	%5 = getelemptr %4, 0
+	store 4, %5
+	%6 = getelemptr %4, 1
+	store 0, %6
+	%7 = getelemptr %4, 2
+	store 0, %7
+	@sum_2 = alloc i32
+	store 0, @sum_2
+	@i_2 = alloc i32
+	store 0, @i_2
+	jump %while_entry_0
+%while_entry_0:
+	%8 = load @i_2
+	%9 = lt %8, 2
+	br %9, %while_body_0, %while_end_0
+%while_body_0:
+	@j_4 = alloc i32
+	store 0, @j_4
+	jump %while_entry_1
+%while_entry_1:
+	%10 = load @j_4
+	%11 = lt %10, 3
+	br %11, %while_body_1, %while_end_1
+%while_body_1:
+	%12 = load @sum_2
+	%13 = load @i_2
+	%14 = load @j_4
+	%15 = getelemptr @b_2, %13
+	%16 = getelemptr %15, %14
+	%17 = load %16
+	%18 = add %12, %17
+	%19 = load @i_2
+	%20 = load @j_4
+	%21 = getelemptr @gb_0, %19
+	%22 = getelemptr %21, %20
+	%23 = load %22
+	%24 = add %18, %23
+	store %24, @sum_2
+	%25 = load @j_4
+	%26 = add %25, 1
+	store %26, @j_4
+	jump %while_entry_1
+%while_end_1:
+	%27 = load @i_2
+	%28 = add %27, 1
+	store %28, @i_2
+	jump %while_entry_0
+%while_end_0:
+	store 0, @i_2
+	jump %while_entry_2
+%while_entry_2:
+	%29 = load @i_2
+	%30 = lt %29, 10
+	br %30, %while_body_2, %while_end_2
+%while_body_2:
+	%31 = load @sum_2
+	%32 = load @i_2
+	%33 = add %31, %32
+	%34 = load @i_2
+	%35 = getelemptr @a_2, %34
+	store %33, %35
+	%36 = load @sum_2
+	%37 = load @i_2
+	%38 = add %36, %37
+	%39 = load @i_2
+	%40 = getelemptr @ga_0, %39
+	store %38, %40
+	%41 = load @i_2
+	%42 = add %41, 1
+	store %42, @i_2
+	jump %while_entry_2
+%while_end_2:
+	%43 = load @sum_2
+	ret %43
 %jump_0:
 	ret 0
 }
