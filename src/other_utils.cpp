@@ -1,5 +1,10 @@
 #include "include/other_utils.hpp"
 
+/**
+ * @brief 将 koopa_raw_value_tag_t 转换为字符串
+ * @param[in] tag koopa_raw_value_tag_t
+ * @return 字符串
+ */
 string koopaRawValueTagToString(int tag) {
     switch (tag) {
     case koopa_raw_value_tag_t::KOOPA_RVT_INTEGER:
@@ -41,7 +46,11 @@ string koopaRawValueTagToString(int tag) {
     }
 }
 
-
+/**
+ * @brief 将 koopa_raw_binary_op_t 转换为字符串
+ * @param[in] op koopa_raw_binary_op_t
+ * @return 字符串
+ */
 string koopaRawBinaryOpToString(int op) {
     switch (op) {
     case koopa_raw_binary_op_t::KOOPA_RBO_EQ:
@@ -83,6 +92,11 @@ string koopaRawBinaryOpToString(int op) {
     }
 }
 
+/**
+ * @brief 将 koopa_raw_slice_item_kind_t 转换为字符串
+ * @param[in] kind koopa_raw_slice_item_kind_t
+ * @return 字符串
+ */
 string koopaRawSliceKindItemToString(int kind) {
     switch (kind) {
     case koopa_raw_slice_item_kind_t::KOOPA_RSIK_FUNCTION:
@@ -96,6 +110,11 @@ string koopaRawSliceKindItemToString(int kind) {
     }
 }
 
+/**
+ * @brief 将 koopa_raw_type_tag_t 转换为字符串
+ * @param[in] tag koopa_raw_type_tag_t
+ * @return 字符串
+ */
 string koopaRawTypeTagToString(int tag) {
     switch (tag) {
     case koopa_raw_type_tag_t::KOOPA_RTT_INT32:

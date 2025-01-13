@@ -1,9 +1,17 @@
+/* 
+Flex 词法分析器文件，这些正则规则描述了输入的字符流如何被分割成标记（tokens）。
+完成词法分析后，工作流程如下：
+1. 生成词法分析器：Flex 读取 `.l` 文件并生成一个 C 语言的词法分析器，通常名为 `lex.yy.c`。
+2. 编译词法分析器：使用 C 编译器将 `lex.yy.c` 编译成可执行文件。
+ */
+
+/* 控制 Flex 的某些行为 */
 %option noyywrap
 %option nounput
 %option noinput
 
 %{
-
+/* 运行时包含的头文件 */
 #include <cstdlib>
 #include <string>
 

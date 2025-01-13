@@ -114,13 +114,17 @@ void visit(const koopa_raw_function_t& func) {
 	cnt += alloc_size;
 	// 对齐到 16 的倍数
 	cnt = (cnt + 15) / 16 * 16;
-	// [DEBUG]：检查是否超过 imm12 的限制
+	// ---[DEBUG]---
+	// 检查是否超过 imm12 的限制
 	// cnt = 8000;
+	// ---[DEBUG END]---
 	context_manager.create_context(func->name + 1, cnt);
 	riscv._addi("sp", "sp", -cnt);
 	context = context_manager.get_context(func->name + 1);
-	// [DEBUG]：检查是否超过 imm12 的限制
+	// ---[DEBUG]---
+	// 检查是否超过 imm12 的限制
 	// context.stack_used = 2040;
+	// ---[DEBUG END]---
 	// 如果函数体内有 call 指令，则需要存储代表返回后下一条指令地址的 ra 寄存器到栈底
 	if (has_call) {
 		riscv._sw("ra", "sp", context.stack_size - 4);
@@ -176,13 +180,17 @@ int get_alloc_size(const koopa_raw_type_t ty) {
  * @param[in] value 指令
  */
 void alloc(const koopa_raw_value_t& value) {
-	// [DEBUG]：输出 alloc 指令的名称和类型
+	// ---[DEBUG]---
+	// 输出 alloc 指令的名称和类型
 	// printf("alloc name: %s\n", value->name);
 	// printf("alloc rtt: %s\n", koopaRawTypeTagToString(value->ty->tag).c_str());
+	// ---[DEBUG END]---
 	// 计算 alloc 指令分配的空间大小
 	int size = get_alloc_size(value->ty->data.pointer.base);
-	// [DEBUG]：输出 alloc 指令分配的空间大小
+	// ---[DEBUG]---
+	// 输出 alloc 指令分配的空间大小
 	// printf("alloc size: %d\n", size);
+	// ---[DEBUG END]---
 	// 记录栈偏移
 	context.stack_map[value] = context.stack_used;
 	// 更新已用栈帧
@@ -196,13 +204,15 @@ void alloc(const koopa_raw_value_t& value) {
 void visit(const koopa_raw_value_t& value) {
 	// 根据值（指令）的类型判断后续需要如何访问
 	const auto& kind = value->kind;
-	// RVT: Raw Value Tag, 区分指令类型
+	// 重置寄存器计数器，避免寄存器超限
 	register_manager.reset();
-	// [DEBUG]：输出指令类型  
+	// ---[DEBUG]---
+	// 输出指令类型  
 	// printf("visit: %s\n", koopaRawValueTagToString(kind.tag).c_str());
-	// [DEBUG]
 	// riscv_ofs << "---" << endl;
 	// riscv_ofs << "[" << koopaRawValueTagToString(kind.tag).c_str() << "]" << endl;
+	// ---[DEBUG END]---
+	// RVT: Raw Value Tag, 区分指令类型
 	// 说明：什么时候传 value，什么时候不传
 	// 1. 如果需要存储单条值（指令）的计算结果，则需要传入 value
 	// 2. 否则不传入 value
@@ -329,11 +339,13 @@ void visit(const koopa_raw_aggregate_t& aggregate) {
  * @param[in] value getptr 指针计算指令自身，存储时用作键
  */
 void visit(const koopa_raw_get_ptr_t& get_ptr, const koopa_raw_value_t& value) {
-	// [DEBUG]
+	// ---[DEBUG]---
+	// 输出 getptr 指令的 src 和 index 的类型
 	// printf("get_ptr src: %s\n", koopaRawValueTagToString(get_ptr.src->kind.tag).c_str());
 	// printf("get_ptr index: %s\n", koopaRawValueTagToString(get_ptr.index->kind.tag).c_str());
 	// riscv_ofs << "get_ptr src: " << koopaRawValueTagToString(get_ptr.src->kind.tag).c_str() << endl;
 	// riscv_ofs << "get_ptr index: " << koopaRawValueTagToString(get_ptr.index->kind.tag).c_str() << endl;
+	// ---[DEBUG END]---
 	// 获取栈偏移
 	auto offset = context.stack_map[get_ptr.src];
 	// 准备存放基准值的寄存器
@@ -388,11 +400,13 @@ void visit(const koopa_raw_get_ptr_t& get_ptr, const koopa_raw_value_t& value) {
  * @param[in] value getelemptr 指针计算指令自身，存储时用作键
  */
 void visit(const koopa_raw_get_elem_ptr_t& get_elem_ptr, const koopa_raw_value_t& value) {
-	// [DEBUG]
+	// ---[DEBUG]---
+	// 输出 getelemptr 指令的 src 和 index 的类型
 	// printf("get_elem_ptr src: %s\n", koopaRawValueTagToString(get_elem_ptr.src->kind.tag).c_str());
 	// printf("get_elem_ptr index: %s\n", koopaRawValueTagToString(get_elem_ptr.index->kind.tag).c_str());
 	// riscv_ofs << "get_elem_ptr src: " << koopaRawValueTagToString(get_elem_ptr.src->kind.tag).c_str() << endl;
 	// riscv_ofs << "get_elem_ptr index: " << koopaRawValueTagToString(get_elem_ptr.index->kind.tag).c_str() << endl;
+	// ---[DEBUG END]---
 	// 获取栈偏移
 	auto offset = context.stack_map[get_elem_ptr.src];
 	// 准备存放基准值的寄存器
@@ -557,10 +571,11 @@ void visit(const koopa_raw_load_t& load, const koopa_raw_value_t& value) {
 	auto reg = register_manager.new_reg();
 	// 获取当前栈偏移，压栈加载出来的值时需要用到
 	auto bias = context.stack_used;
+	// ---[DEBUG]---
 	// 打印加载的值的类型
-	// [DEBUG]
 	// printf("load: %s\n", koopaRawValueTagToString(load.src->kind.tag).c_str());
 	// riscv_ofs << "load: " << koopaRawValueTagToString(load.src->kind.tag).c_str() << endl;
+	// ---[DEBUG END]---
 	// 如果是全局变量，需要先获取地址，再解引用获取值
 	if (load.src->kind.tag == KOOPA_RVT_GLOBAL_ALLOC) {
 		riscv._la(reg, context_manager.get_global(load.src));
@@ -590,10 +605,11 @@ void visit(const koopa_raw_load_t& load, const koopa_raw_value_t& value) {
  * @param[in] store store 指令的数据
  */
 void visit(const koopa_raw_store_t& store) {
-	// [DEBUG]
+	// ---[DEBUG]---
 	// 打印要存储的值和目标地址的类型
 	// printf("store value: %s\n", koopaRawValueTagToString(store.value->kind.tag).c_str());
 	// printf("store dest: %s\n", koopaRawValueTagToString(store.dest->kind.tag).c_str());
+	// ---[DEBUG END]---
 	// 准备要存储的值
 	register_manager.get_operand_reg(store.value);
 	// 如果是全局变量，需要先获取地址，再存储到解引用后的位置上
@@ -628,9 +644,10 @@ void visit(const koopa_raw_store_t& store) {
 void visit(const koopa_raw_return_t& ret) {
 	// 如果返回值非空，那么先把值搞到 a0 寄存器中
 	if (ret.value != nullptr) {
+		// ---[DEBUG]---
 		// 打印返回值的类型
-		// [DEBUG]
 		// printf("return: %s\n", koopaRawValueTagToString(ret.value->kind.tag).c_str());
+		// ---[DEBUG END]---
 		// 判断返回值的类型
 		switch (ret.value->kind.tag) {
 			// 形如 ret 1 直接返回整数的

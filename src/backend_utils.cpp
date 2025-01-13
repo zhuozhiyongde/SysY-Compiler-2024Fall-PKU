@@ -1,5 +1,9 @@
 #include "include/backend_utils.hpp"
 
+/**
+ * @brief 解析 KoopaIR 字符串，生成 Riscv 汇编代码
+ * @param[in] koopa_ir KoopaIR 字符串
+ */
 void parse_riscv(const char* koopa_ir) {
     // 解析字符串 str, 得到 Koopa IR 程序
     koopa_program_t program;
@@ -40,62 +44,132 @@ int is_power_of_two(int x) {
     }
 }
 
+/**
+ * @brief 生成 .data 宏
+ */
 void Riscv::_data() {
     riscv_ofs << "\t.data" << endl;
 }
 
+/**
+ * @brief 生成 .text 宏
+ */
 void Riscv::_text() {
     riscv_ofs << "\t.text" << endl;
 }
 
+/**
+ * @brief 生成 .globl name 宏
+ * @param[in] name 全局变量名
+ */
 void Riscv::_globl(const string& name) {
     riscv_ofs << "\t.globl " << name << endl;
 }
 
+/**
+ * @brief 生成 .word value 宏
+ * @param[in] value 要存储的值
+ */
 void Riscv::_word(const int& value) {
     riscv_ofs << "\t.word " << value << endl;
 }
 
+/**
+ * @brief 生成 .zero len 宏
+ * @param[in] len 要填充的 0 的个数
+ */
 void Riscv::_zero(const int& len) {
     riscv_ofs << "\t.zero " << len << endl;
 }
 
+/**
+ * @brief 生成 label 标签，即 `name:`
+ * @param[in] name 标签名
+ */
 void Riscv::_label(const string& name) {
     riscv_ofs << name << ":" << endl;
 }
 
+/**
+ * @brief 生成 call ident 指令
+ * @param[in] ident 函数名
+ */
 void Riscv::_call(const string& ident) {
     riscv_ofs << "\tcall " << ident << endl;
 }
 
+/**
+ * @brief 生成 ret 指令
+ */
 void Riscv::_ret() {
     riscv_ofs << "\tret" << endl;
 }
 
+/**
+ * @brief 生成 seqz 指令，即比较 rs1 是否为 0，若为 0 则将 rd 置 1，否则置 0
+ * @param[in] rd 目标寄存器
+ * @param[in] rs1 源寄存器
+ */
 void Riscv::_seqz(const string& rd, const string& rs1) {
     riscv_ofs << "\tseqz " << rd << ", " << rs1 << endl;
 }
 
+/**
+ * @brief 生成 snez 指令，即比较 rs1 是否为 0，若不为 0 则将 rd 置 1，否则置 0
+ * @param[in] rd 目标寄存器
+ * @param[in] rs1 源寄存器
+ */
 void Riscv::_snez(const string& rd, const string& rs1) {
     riscv_ofs << "\tsnez " << rd << ", " << rs1 << endl;
 }
 
+/**
+ * @brief 生成 or 指令，即 rd = rs1 | rs2
+ * @param[in] rd 目标寄存器
+ * @param[in] rs1 源寄存器 1
+ * @param[in] rs2 源寄存器 2
+ */
 void Riscv::_or(const string& rd, const string& rs1, const string& rs2) {
     riscv_ofs << "\tor " << rd << ", " << rs1 << ", " << rs2 << endl;
 }
 
+/**
+ * @brief 生成 and 指令，即 rd = rs1 & rs2
+ * @param[in] rd 目标寄存器
+ * @param[in] rs1 源寄存器 1
+ * @param[in] rs2 源寄存器 2
+ */
 void Riscv::_and(const string& rd, const string& rs1, const string& rs2) {
     riscv_ofs << "\tand " << rd << ", " << rs1 << ", " << rs2 << endl;
 }
 
+/**
+ * @brief 生成 xor 指令，即 rd = rs1 ^ rs2
+ * @param[in] rd 目标寄存器
+ * @param[in] rs1 源寄存器 1
+ * @param[in] rs2 源寄存器 2
+ */
 void Riscv::_xor(const string& rd, const string& rs1, const string& rs2) {
     riscv_ofs << "\txor " << rd << ", " << rs1 << ", " << rs2 << endl;
 }
 
+/**
+ * @brief 生成 add 指令，即 rd = rs1 + rs2
+ * @param[in] rd 目标寄存器
+ * @param[in] rs1 源寄存器 1
+ * @param[in] rs2 源寄存器 2
+ */
 void Riscv::_add(const string& rd, const string& rs1, const string& rs2) {
     riscv_ofs << "\tadd " << rd << ", " << rs1 << ", " << rs2 << endl;
 }
 
+/**
+ * @brief 生成 addi 指令，即 rd = rs1 + imm，会自动处理 12 位立即数限制
+ * @param[in] rd 目标寄存器
+ * @param[in] rs1 源寄存器
+ * @param[in] imm 立即数
+ * @note 如果 imm 超过 12 位立即数限制，则会先将其存入一个临时寄存器，再进行加法运算
+ */
 void Riscv::_addi(const string& rd, const string& rs1, const int& imm) {
     if (imm >= -2048 && imm < 2048) {
         riscv_ofs << "\taddi " << rd << ", " << rs1 << ", " << imm << endl;
@@ -107,46 +181,110 @@ void Riscv::_addi(const string& rd, const string& rs1, const int& imm) {
     }
 }
 
+/**
+ * @brief 生成 sub 指令，即 rd = rs1 - rs2
+ * @param[in] rd 目标寄存器
+ * @param[in] rs1 源寄存器 1
+ * @param[in] rs2 源寄存器 2
+ */
 void Riscv::_sub(const string& rd, const string& rs1, const string& rs2) {
     riscv_ofs << "\tsub " << rd << ", " << rs1 << ", " << rs2 << endl;
 }
 
+/**
+ * @brief 生成 mul 指令，即 rd = rs1 * rs2
+ * @param[in] rd 目标寄存器
+ * @param[in] rs1 源寄存器 1
+ * @param[in] rs2 源寄存器 2
+ */
 void Riscv::_mul(const string& rd, const string& rs1, const string& rs2) {
     riscv_ofs << "\tmul " << rd << ", " << rs1 << ", " << rs2 << endl;
 }
 
+/**
+ * @brief 生成 div 指令，即 rd = rs1 / rs2
+ * @param[in] rd 目标寄存器
+ * @param[in] rs1 源寄存器 1
+ * @param[in] rs2 源寄存器 2
+ */
 void Riscv::_div(const string& rd, const string& rs1, const string& rs2) {
     riscv_ofs << "\tdiv " << rd << ", " << rs1 << ", " << rs2 << endl;
 }
 
+/**
+ * @brief 生成 rem（取余）指令，即 rd = rs1 % rs2
+ * @param[in] rd 目标寄存器
+ * @param[in] rs1 源寄存器 1
+ * @param[in] rs2 源寄存器 2
+ */
 void Riscv::_rem(const string& rd, const string& rs1, const string& rs2) {
     riscv_ofs << "\trem " << rd << ", " << rs1 << ", " << rs2 << endl;
 }
 
+/**
+ * @brief 生成 sgt 指令，即 rd = rs1 > rs2
+ * @param[in] rd 目标寄存器
+ * @param[in] rs1 源寄存器 1
+ * @param[in] rs2 源寄存器 2
+ */
 void Riscv::_sgt(const string& rd, const string& rs1, const string& rs2) {
     riscv_ofs << "\tsgt " << rd << ", " << rs1 << ", " << rs2 << endl;
 }
 
+/**
+ * @brief 生成 slt 指令，即 rd = rs1 < rs2
+ * @param[in] rd 目标寄存器
+ * @param[in] rs1 源寄存器 1
+ * @param[in] rs2 源寄存器 2
+ */
 void Riscv::_slt(const string& rd, const string& rs1, const string& rs2) {
     riscv_ofs << "\tslt " << rd << ", " << rs1 << ", " << rs2 << endl;
 }
 
+/**
+ * @brief 生成 sll（左移）指令，即 rd = rs1 << rs2
+ * @param[in] rd 目标寄存器
+ * @param[in] rs1 源寄存器 1
+ * @param[in] rs2 源寄存器 2
+ */
 void Riscv::_sll(const string& rd, const string& rs1, const string& rs2) {
     riscv_ofs << "\tsll " << rd << ", " << rs1 << ", " << rs2 << endl;
 }
 
+/**
+ * @brief 生成 li（加载立即数）指令，即 rd = imm
+ * @param[in] rd 目标寄存器
+ * @param[in] imm 立即数
+ */
 void Riscv::_li(const string& rd, const int& imm) {
     riscv_ofs << "\tli " << rd << ", " << imm << endl;
 }
 
+/**
+ * @brief 生成 mv（移动）指令，即 rd = rs1
+ * @param[in] rd 目标寄存器
+ * @param[in] rs1 源寄存器
+ */
 void Riscv::_mv(const string& rd, const string& rs1) {
     riscv_ofs << "\tmv " << rd << ", " << rs1 << endl;
 }
 
+/**
+ * @brief 生成 la（加载地址）指令，即 rd = rs1
+ * @param[in] rd 目标寄存器
+ * @param[in] rs1 源寄存器
+ */
 void Riscv::_la(const string& rd, const string& rs1) {
     riscv_ofs << "\tla " << rd << ", " << rs1 << endl;
 }
 
+/**
+ * @brief 生成 lw（加载字）指令，即 rd = *(base + bias)
+ * @param[in] rd 目标寄存器
+ * @param[in] base 基址寄存器
+ * @param[in] bias 偏移量
+ * @note 会自动处理偏移量，若偏移量超过 12 位立即数限制，则先将其存入一个临时寄存器，再进行加法运算
+ */
 void Riscv::_lw(const string& rd, const string& base, const int& bias) {
     // 检查偏移量是否在 12 位立即数范围内
     if (bias >= -2048 && bias < 2048) {
@@ -160,19 +298,32 @@ void Riscv::_lw(const string& rd, const string& base, const int& bias) {
     }
 }
 
-void Riscv::_sw(const string& rs1, const string& base, const int& bias) {
+/**
+ * @brief 生成 sw（存储字）指令，即 *(base + bias) = rs1
+ * @param[in] rs 源寄存器
+ * @param[in] base 基址寄存器
+ * @param[in] bias 偏移量
+ * @note 会自动处理偏移量，若偏移量超过 12 位立即数限制，则先将其存入一个临时寄存器，再进行加法运算
+ */
+void Riscv::_sw(const string& rs, const string& base, const int& bias) {
     // 检查偏移量是否在 12 位立即数范围内
     if (bias >= -2048 && bias < 2048) {
-        riscv_ofs << "\tsw " << rs1 << ", " << bias << "(" << base << ")" << endl;
+        riscv_ofs << "\tsw " << rs << ", " << bias << "(" << base << ")" << endl;
     }
     else {
         auto reg = register_manager.tmp_reg();
         _li(reg, bias);
         _add(reg, base, reg);
-        riscv_ofs << "\tsw " << rs1 << ", " << "(" << reg << ")" << endl;
+        riscv_ofs << "\tsw " << rs << ", " << "(" << reg << ")" << endl;
     }
 }
 
+/**
+ * @brief 生成 bnez 指令，即 if (cond != 0) goto label
+ * @param[in] cond 条件寄存器
+ * @param[in] label 跳转目标标签
+ * @note 会生成多个标签，将短跳转转为长跳转，避免跳转范围限制
+ */
 void Riscv::_bnez(const string& cond, const string& label) {
     auto target_1 = context_manager.get_branch_label();
     auto target_2 = context_manager.get_branch_end_label();
@@ -183,6 +334,12 @@ void Riscv::_bnez(const string& cond, const string& label) {
     _label(target_2);
 }
 
+/**
+ * @brief 生成 beqz 指令，即 if (cond == 0) goto label
+ * @param[in] cond 条件寄存器
+ * @param[in] label 跳转目标标签
+ * @note 会生成多个标签，将短跳转转为长跳转，避免跳转范围限制
+ */
 void Riscv::_beqz(const string& cond, const string& label) {
     auto target_1 = context_manager.get_branch_label();
     auto target_2 = context_manager.get_branch_end_label();
@@ -193,11 +350,21 @@ void Riscv::_beqz(const string& cond, const string& label) {
     _label(target_2);
 }
 
+/**
+ * @brief 生成 j（跳转）指令，即 goto label
+ * @param[in] label 跳转目标标签
+ */
 void Riscv::_jump(const string& label) {
     riscv_ofs << "\tj " << label << endl;
 }
 
-// 将一个指令的结果存储到栈中，与 _sw 不同，_sw 也可以将一个寄存器的值存到栈中。
+/**
+ * @brief 将一个值（value）存储到栈中 `stack_map` 中，这个值在后续编译时会使用
+ * @param[in] value 指令结果
+ * @param[in] bias 偏移量
+ * @note 与 _sw 不同，_sw 是生成存储指令，而 push 是真的在表中记录
+ * @note 请参见 visit(koopa_raw_value_t) 何时会传递 value
+ */
 void Context::push(const koopa_raw_value_t& value, int bias) {
     // string msg = "bias: " + to_string(bias) + " stack_size: " + to_string(stack_size);
     // cout << msg << endl;
@@ -206,32 +373,63 @@ void Context::push(const koopa_raw_value_t& value, int bias) {
     stack_used += 4;
 }
 
+/**
+ * @brief 创建一个 Context 对象
+ * @param[in] name 函数名
+ * @param[in] stack_size 栈空间大小
+ */
 void ContextManager::create_context(const string& name, int stack_size) {
     context_map[name] = Context(stack_size);
 }
 
+/**
+ * @brief 获取一个 Context 对象
+ * @param[in] name 函数名
+ * @return 对应的 Context 对象
+ */
 Context& ContextManager::get_context(const string& name) {
     return context_map[name];
 }
 
+/**
+ * @brief 创建一个全局变量，并增加全局变量计数器
+ * @param[in] value 全局变量
+ */
 void ContextManager::create_global(const koopa_raw_value_t& value) {
     auto global_name = "global_" + to_string(global_count);
     global_count++;
     global_map[value] = global_name;
 }
 
+/**
+ * @brief 获取一个全局变量的名字
+ * @param[in] value 全局变量
+ * @return 全局变量的名字
+ */
 string ContextManager::get_global(const koopa_raw_value_t& value) {
     return global_map[value];
 }
 
+/**
+ * @brief 获取一个分支标签，并增加分支计数器
+ * @return 分支标签
+ */
 string ContextManager::get_branch_label() {
     return "branch_" + to_string(branch_count++);
 }
 
+/**
+ * @brief 获取一个分支结束标签
+ * @return 分支结束标签
+ */
 string ContextManager::get_branch_end_label() {
     return "branch_end_" + to_string(branch_count);
 }
 
+/**
+ * @brief 获取当前寄存器
+ * @return 当前寄存器
+ */
 string RegisterManager::cur_reg() {
     // x0 是一个特殊的寄存器, 它的值恒为 0, 且向它写入的任何数据都会被丢弃.
     // t0 到 t6 寄存器, 以及 a0 到 a7 寄存器可以用来存放临时值.
@@ -243,12 +441,20 @@ string RegisterManager::cur_reg() {
     }
 }
 
+/**
+ * @brief 获取一个新的寄存器，并增加寄存器计数器
+ * @return 新的寄存器
+ */
 string RegisterManager::new_reg() {
     string reg = cur_reg();
     reg_count++;
     return reg;
 }
 
+/**
+ * @brief 获取一个临时寄存器，调用完后不会增加寄存器计数器
+ * @return 临时寄存器
+ */
 string RegisterManager::tmp_reg() {
     reg_count++;
     auto ret = cur_reg();
@@ -256,8 +462,16 @@ string RegisterManager::tmp_reg() {
     return ret;
 }
 
+/**
+ * @brief 获取一个值对应的寄存器
+ * @param[in] value 值
+ * @return 是否额外使用寄存器，若可以推断出值是 0，则不使用寄存器，否则使用寄存器
+ */
 bool RegisterManager::get_operand_reg(const koopa_raw_value_t& value) {
-    printf("get_operand_reg: %s\n", koopaRawValueTagToString(value->kind.tag).c_str());
+    // ---[DEBUG]---
+    // 打印值的类型
+    // printf("get_operand_reg: %s\n", koopaRawValueTagToString(value->kind.tag).c_str());
+    // ---[DEBUG END]---
     // 运算数为整数
     if (value->kind.tag == KOOPA_RVT_INTEGER) {
         if (value->kind.data.integer.value == 0) {
@@ -307,6 +521,7 @@ bool RegisterManager::get_operand_reg(const koopa_raw_value_t& value) {
         }
         return true;
     }
+    // 其他情况，报错
     else {
         auto msg = "Invalid operand: " + koopaRawValueTagToString(value->kind.tag);
         assert(false && msg.c_str());
@@ -314,6 +529,9 @@ bool RegisterManager::get_operand_reg(const koopa_raw_value_t& value) {
     return true;
 }
 
+/**
+ * @brief 重置寄存器计数器
+ */
 void RegisterManager::reset() {
     reg_count = 0;
 }
