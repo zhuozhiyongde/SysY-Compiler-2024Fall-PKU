@@ -63,5 +63,16 @@ int main(int argc, const char* argv[]) {
     parse_riscv(koopa_ir);
     riscv_ofs.close();
   }
+  else if (mode == "-perf") {
+    koopa_ofs.open("ir.koopa");
+    ast->print();
+    koopa_ofs.close();
+    char koopa_ir[1 << 20];
+    ifstream koopa_ifs("ir.koopa");
+    koopa_ifs.read(koopa_ir, sizeof(koopa_ir));
+    riscv_ofs.open(output);
+    parse_riscv(koopa_ir);
+    riscv_ofs.close();
+  }
   return 0;
 }

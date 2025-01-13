@@ -119,11 +119,15 @@ Result ConstDeclAST::print() const {
   return Result();
 }
 
+/**
+ * @brief TODO
+ */
 Result ConstDefAST::print() const {
   // 在当前层级符号表中分配常量名
   string ident_with_suffix = local_symbol_table->assign(ident);
   // 数组常量
   if (array_index->size() > 0) {
+    // 准备数组索引
     vector<int> index_results;
     for (auto& item : *array_index) {
       Result index_result = item->print();
@@ -132,18 +136,22 @@ Result ConstDefAST::print() const {
     // 输出类型声明
     print_array_type(ident_with_suffix, index_results);
     // 判断是否初始化
+    // 给定了初始化列表
     if (value) {
       ((ConstInitValAST*)value.get())->print(ident_with_suffix, index_results);
     }
+    // 没有给定初始化列表
     else {
+      // 全局数组
       if (environment_manager.is_global) {
         koopa_ofs << ", zeroinit" << endl;
       }
+      // 局部数组
       else {
         koopa_ofs << endl;
       }
     }
-    // 在当前层级符号表中创建变量
+    // 在当前层级符号表中创建数组类型常量
     local_symbol_table->create(ident_with_suffix, ARR_(array_index->size()));
     return Result();
   }
@@ -187,10 +195,9 @@ void ConstInitValAST::init(const vector<int>& indices, int*& arr, int& cur, int 
       // 如果是初始化列表
       else if (it->init_values) {
         // 从前到后遍历 step，看是否能整除
-        bool is_first = true;
+        // bool is_first = true;
         for (auto& step : steps) {
-          if (cur == 0 && is_first) {
-            is_first = false;
+          if (step >= align) {
             continue;
           }
           // 找到正确的 step
@@ -333,10 +340,9 @@ void InitValAST::init(const vector<int>& indices, int* arr, int& cur, int align)
       // 如果是初始化列表
       else if (it->init_values) {
         // 从前到后遍历 step，看是否能整除
-        bool is_first = true;
+        // bool is_first = true;
         for (auto& step : steps) {
-          if (cur == 0 && is_first) {
-            is_first = false;
+          if (step >= align) {
             continue;
           }
           // koopa_ofs << "here: " << step << " " << cur << endl;
