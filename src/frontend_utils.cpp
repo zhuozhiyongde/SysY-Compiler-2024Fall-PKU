@@ -143,6 +143,11 @@ void init_lib() {
     koopa_ofs << endl;
 }
 
+/**
+ * @brief 格式化数组类型，输入 <2,3>，输出 [[i32, 3], 2]
+ * @param indices 数组维度向量，正序
+ * @note 对于空向量，输出 i32
+ */
 void format_array_type(const vector<int>& indices) {
     if (indices.empty()) {
         koopa_ofs << "i32";

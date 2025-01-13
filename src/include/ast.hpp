@@ -15,7 +15,6 @@
 using namespace std;
 
 extern string mode;
-extern ofstream debug_ofs;
 extern ofstream koopa_ofs;
 extern ofstream riscv_ofs;
 

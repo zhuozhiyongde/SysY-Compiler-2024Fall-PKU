@@ -20,59 +20,53 @@ extern int yyparse(unique_ptr<BaseAST>& ast);
 
 string mode = "-debug";
 
-ofstream debug_ofs;
 ofstream koopa_ofs;
 ofstream riscv_ofs;
 
 int main(int argc, const char* argv[]) {
-  // 解析命令行参数. 测试脚本/评测平台要求你的编译器能接收如下参数:
-  // compiler 模式 输入文件 -o 输出文件
-  assert(argc == 5);
-  mode = argv[1];
-  auto input = argv[2];
-  auto output = argv[4];
+	// 解析命令行参数. 测试脚本/评测平台要求你的编译器能接收如下参数:
+	// compiler 模式 输入文件 -o 输出文件
+	assert(argc == 5);
+	mode = argv[1];
+	auto input = argv[2];
+	auto output = argv[4];
 
-  // 打开输入文件, 并且指定 lexer 在解析的时候读取这个文件
-  yyin = fopen(input, "r");
-  assert(yyin);
+	// 打开输入文件, 并且指定 lexer 在解析的时候读取这个文件
+	yyin = fopen(input, "r");
+	assert(yyin);
 
-  // 调用 parser 函数, parser 函数会进一步调用 lexer 解析输入文件的
-  unique_ptr<BaseAST> ast;
-  auto ret = yyparse(ast);
-  assert(!ret);
-  // 输出解析得到的 AST, 其实就是个字符串
+	// 调用 parser 函数, parser 函数会进一步调用 lexer 解析输入文件的
+	unique_ptr<BaseAST> ast;
+	auto ret = yyparse(ast);
+	assert(!ret);
+	// 输出解析得到的 AST, 其实就是个字符串
 
-  if (mode == "-debug") {
-    freopen(output, "w", stdout);
-    ast->print();
-    fclose(stdout);
-  }
-  else if (mode == "-koopa") {
-    koopa_ofs.open(output);
-    ast->print();
-    koopa_ofs.close();
-  }
-  else if (mode == "-riscv") {
-    koopa_ofs.open("ir.koopa");
-    ast->print();
-    koopa_ofs.close();
-    char koopa_ir[1 << 20];
-    ifstream koopa_ifs("ir.koopa");
-    koopa_ifs.read(koopa_ir, sizeof(koopa_ir));
-    riscv_ofs.open(output);
-    parse_riscv(koopa_ir);
-    riscv_ofs.close();
-  }
-  else if (mode == "-perf") {
-    koopa_ofs.open("ir.koopa");
-    ast->print();
-    koopa_ofs.close();
-    char koopa_ir[1 << 20];
-    ifstream koopa_ifs("ir.koopa");
-    koopa_ifs.read(koopa_ir, sizeof(koopa_ir));
-    riscv_ofs.open(output);
-    parse_riscv(koopa_ir);
-    riscv_ofs.close();
-  }
-  return 0;
+	if (mode == "-koopa") {
+		koopa_ofs.open(output);
+		ast->print();
+		koopa_ofs.close();
+	}
+	else if (mode == "-riscv") {
+		koopa_ofs.open("ir.koopa");
+		ast->print();
+		koopa_ofs.close();
+		char koopa_ir[1 << 20];
+		ifstream koopa_ifs("ir.koopa");
+		koopa_ifs.read(koopa_ir, sizeof(koopa_ir));
+		riscv_ofs.open(output);
+		parse_riscv(koopa_ir);
+		riscv_ofs.close();
+	}
+	else if (mode == "-perf") {
+		koopa_ofs.open("ir.koopa");
+		ast->print();
+		koopa_ofs.close();
+		char koopa_ir[1 << 20];
+		ifstream koopa_ifs("ir.koopa");
+		koopa_ifs.read(koopa_ir, sizeof(koopa_ir));
+		riscv_ofs.open(output);
+		parse_riscv(koopa_ir);
+		riscv_ofs.close();
+	}
+	return 0;
 }
