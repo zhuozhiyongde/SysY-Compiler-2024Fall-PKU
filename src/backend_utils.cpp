@@ -22,6 +22,24 @@ void parse_riscv(const char* koopa_ir) {
     koopa_delete_raw_program_builder(builder);
 }
 
+/**
+ * @brief 判断一个数是否为 2 的幂次
+ * @param[in] x 要判断的数
+ * @return 是否为 2 的幂次，若为 2 的幂次则返回幂次，否则返回 -1
+ */
+int is_power_of_two(int x) {
+    if (x <= 0) {
+        return -1;
+    }
+    double logResult = log2(x);
+    if (floor(logResult) == logResult) {
+        return static_cast<int>(logResult);
+    }
+    else {
+        return -1;
+    }
+}
+
 void Riscv::_data() {
     riscv_ofs << "\t.data" << endl;
 }

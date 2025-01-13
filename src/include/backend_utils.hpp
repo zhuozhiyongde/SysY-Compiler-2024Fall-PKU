@@ -4,6 +4,7 @@
 #include <cstring>
 #include <iostream>
 #include <fstream> 
+#include <cmath>
 #include <unordered_map>
 #include "include/other_utils.hpp"
 #include "include/asm.hpp"
@@ -11,6 +12,7 @@
 using namespace std;
 
 void parse_riscv(const char* koopa_ir);
+int is_power_of_two(int x);
 
 /**
  * @brief Riscv 类，用于生成 Riscv 汇编代码

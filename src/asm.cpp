@@ -265,8 +265,16 @@ void visit(const koopa_raw_get_ptr_t& get_ptr, const koopa_raw_value_t& value) {
         // riscv_ofs << "bias: " << bias << endl;
         auto step = register_manager.tmp_reg();
         // 要获取步长，就需要获取数组元素的类型
-        riscv._li(step, get_alloc_size(get_ptr.src->ty->data.pointer.base));
-        riscv._mul(bias, bias, step);
+        auto size = get_alloc_size(get_ptr.src->ty->data.pointer.base);
+        auto power = is_power_of_two(size);
+        if (power != -1) {
+            riscv._li(step, power);
+            riscv._sll(bias, bias, step);
+        }
+        else {
+            riscv._li(step, size);
+            riscv._mul(bias, bias, step);
+        }
         // 计算最终地址
         riscv._add(base, base, bias);
     }
@@ -307,8 +315,16 @@ void visit(const koopa_raw_get_elem_ptr_t& get_elem_ptr, const koopa_raw_value_t
         // riscv_ofs << "bias: " << bias << endl;
         auto step = register_manager.tmp_reg();
         // 要获取步长，就需要获取数组元素的类型
-        riscv._li(step, get_alloc_size(get_elem_ptr.src->ty->data.pointer.base->data.array.base));
-        riscv._mul(bias, bias, step);
+        auto size = get_alloc_size(get_elem_ptr.src->ty->data.pointer.base->data.array.base);
+        auto power = is_power_of_two(size);
+        if (power != -1) {
+            riscv._li(step, power);
+            riscv._sll(bias, bias, step);
+        }
+        else {
+            riscv._li(step, size);
+            riscv._mul(bias, bias, step);
+        }
         // 计算最终地址
         riscv._add(base, base, bias);
     }
