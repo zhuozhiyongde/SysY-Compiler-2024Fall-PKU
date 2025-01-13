@@ -156,11 +156,23 @@ void Riscv::_sw(const string& rs1, const string& base, const int& bias) {
 }
 
 void Riscv::_bnez(const string& cond, const string& label) {
-    riscv_ofs << "\tbnez " << cond << ", " << label << endl;
+    auto target_1 = context_manager.get_branch_label();
+    auto target_2 = context_manager.get_branch_end_label();
+    riscv_ofs << "\tbnez " << cond << ", " << target_1 << endl;
+    _jump(target_2);
+    _label(target_1);
+    _jump(label);
+    _label(target_2);
 }
 
 void Riscv::_beqz(const string& cond, const string& label) {
-    riscv_ofs << "\tbeqz " << cond << ", " << label << endl;
+    auto target_1 = context_manager.get_branch_label();
+    auto target_2 = context_manager.get_branch_end_label();
+    riscv_ofs << "\tbeqz " << cond << ", " << target_1 << endl;
+    _jump(target_2);
+    _label(target_1);
+    _jump(label);
+    _label(target_2);
 }
 
 void Riscv::_jump(const string& label) {
@@ -192,6 +204,14 @@ void ContextManager::create_global(const koopa_raw_value_t& value) {
 
 string ContextManager::get_global(const koopa_raw_value_t& value) {
     return global_map[value];
+}
+
+string ContextManager::get_branch_label() {
+    return "branch_" + to_string(branch_count++);
+}
+
+string ContextManager::get_branch_end_label() {
+    return "branch_end_" + to_string(branch_count);
 }
 
 string RegisterManager::cur_reg() {

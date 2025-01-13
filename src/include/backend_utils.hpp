@@ -81,6 +81,8 @@ public:
 class ContextManager {
 private:
     int global_count = 0;
+    // bnez 和 beqz 使用，目的是防止跳转范围过大，转换为 jump 指令
+    int branch_count = 0;
 public:
     unordered_map<string, Context> context_map;
     unordered_map<koopa_raw_value_t, string> global_map;
@@ -88,6 +90,8 @@ public:
     void create_global(const koopa_raw_value_t& value);
     Context& get_context(const string& name);
     string get_global(const koopa_raw_value_t& value);
+    string get_branch_label();
+    string get_branch_end_label();
 };
 
 /**

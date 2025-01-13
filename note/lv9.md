@@ -95,3 +95,61 @@ int main() {
 测试输出是 4 还是 2？
 
 狗日的 step 不一定是 4，还得展开才行。
+
+对于指针，都需要进行一个 `lw t0 0(t0)` 的操作来取值。
+
+## Debug
+
+发现过完本地之后远程 lv9 也能全过，但是 final 会有过不去的，执行：
+
+```bash
+autotest -riscv /root/compiler
+```
+
+发现有几个先前 lv3 的测试点过不去了，仔细检查了一下发现是短路计算的问题，原先的写法是：
+
+```cpp
+if (logical_op == LogicalOp::LOGICAL_OR) {
+    // 左侧为立即数
+    if (lhs.type == Result::Type::IMM) {
+      if (lhs.value != 0) {
+        return IMM_(1);
+      }
+      else {
+        Result rhs = right->print();
+        return rhs;
+      }
+    }
+    // ...
+}
+```
+
+这种写法有一个问题，逻辑表达式返回的必然是一个布尔型，也就是要么是 1 要么是 0，所以我们在判断 `rhs` 的时候不能直接返回，而是：
+
+1. 检查一下其值是否为立即数，若是，则返回 `rhs.value != 0`
+2. 若非立即数而是寄存器，直接返回 `rhs`
+
+也即：
+
+```cpp
+if (logical_op == LogicalOp::LOGICAL_OR) {
+    // 左侧为立即数
+    if (lhs.type == Result::Type::IMM) {
+      if (lhs.value != 0) {
+        return IMM_(1);
+      }
+      else {
+        Result rhs = right->print();
+        if (rhs.type == Result::Type::IMM) {
+          return IMM_(rhs.value != 0);
+        }
+        else {
+          return rhs;
+        }
+      }
+    }
+    // ...
+}
+```
+
+对于 `&&` 运算同理，不再赘述。

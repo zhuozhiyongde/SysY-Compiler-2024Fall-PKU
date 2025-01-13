@@ -10,14 +10,8 @@ decl @stoptime()
 
 fun @main(): i32 {
 %main_entry:
-	@a_2 = alloc [i32, 3]
-	%0 = getelemptr @a_2, 0
-	store 0, %0
-	%1 = getelemptr @a_2, 1
-	store 0, %1
-	%2 = getelemptr @a_2, 2
-	store 0, %2
-	ret 3
+lhs: 2
+	ret 4
 %jump_0:
 	ret 0
 }
