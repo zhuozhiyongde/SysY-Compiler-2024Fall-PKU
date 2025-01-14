@@ -30,19 +30,19 @@
 
 ```
 src
-├── asm.cpp
-├── ast.cpp
-├── backend_utils.cpp
-├── frontend_utils.cpp
 ├── include
 │   ├── asm.hpp
 │   ├── ast.hpp
-│   ├── backend_utils.hpp
 │   ├── frontend_utils.hpp
-│   ├── koopa.h
-│   └── other_utils.hpp
-├── main.cpp
+│   ├── backend_utils.hpp
+│   ├── other_utils.hpp
+│   └── koopa.h
+├── asm.cpp
+├── ast.cpp
+├── frontend_utils.cpp
+├── backend_utils.cpp
 ├── other_utils.cpp
+├── main.cpp
 ├── sysy.l
 └── sysy.y
 ```
@@ -102,10 +102,10 @@ rm hello.o hello
 
 ```cpp
 int main(){
-	int a = 1;
-  putint(a); // 在终端输出 a 的值
-  putch(10); // 在终端初始 ASCII = 10，也即换行符
-  return;
+    int a = 1;
+    putint(a); // 在终端输出 a 的值
+    putch(10); // 在终端初始 ASCII = 10，也即换行符
+    return;
 }
 ```
 
@@ -113,10 +113,10 @@ int main(){
 
 ```cpp
 int main() {
-  int a = 1;
-  int b = 2;
-  int c = a + b;
-  return c;
+    int a = 1;
+    int b = 2;
+    int c = a + b;
+    return c;
 }
 ```
 
