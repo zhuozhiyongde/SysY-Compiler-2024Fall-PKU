@@ -2,7 +2,7 @@
 
 ## Lv3.1
 
-### Koopa IR
+### Koopa
 
 对于产生式的或 `|` 语法，需要支持。
 
@@ -26,8 +26,6 @@ UnaryExp
 ```
 
 对于 AST，由于所有的 AST 都继承自 `BaseAST`，所以我们其实可以使用 `unique_ptr<BaseAST>` 来表示一个 AST 节点，无论他的子节点是基于 `UnaryOp UnaryExp` 得到的还是 `PrimaryExp` 得到的。
-
-但是，出于维护性考虑，我们在这里改变之前的成员类型写法 `unique_ptr<BaseAST>`，使用更严苛的成员类型写法，即要求尖括号 `<>` 中填入具体的类型。
 
 同时，我们引入 `optional` 类型，来表示一个 AST 节点可能不存在的情况。
 
@@ -57,12 +55,12 @@ void UnaryExpAST::print() const {
 }
 ```
 
-由于我们不需要向前兼容，所以移除掉 `ast.cpp` 中对于 mode 的判断。
+由于我们不需要向前兼容那个字符形式的 AST 输出，所以移除掉 `ast.cpp` 中对于 mode 的判断。
 
-由于我们现在的 Return 结果不再是唯一的数字类型了，所以我们需要在 `include/ast.hpp` 中引入 `Result` 类，来表示一个返回值：
+由于我们现在的 Return 结果不再是唯一的数字类型了，所以我们需要在 `include/frontend_utils.hpp` 中引入 `Result` 类，来表示一个返回值：
 
 ```cpp
-// include/ast.hpp
+// include/frontend_utils.hpp
 class Result {
 public:
     enum class Type {
@@ -84,7 +82,7 @@ public:
 
 我们修改所有的 `print()` 函数，使之返回 `Result` 类型，这样的话，我们在嵌套 AST 各个层级时，就能拿到下级 AST 的返回值，并据此操作。
 
-对于不需要 Result 返回值的 AST 类，我们返回一个空的 `Result` 对象即可：
+对于不需要 `Result` 返回值的 AST 类，我们返回一个空的 `Result` 对象即可：
 
 ```cpp
 Result FuncDefAST::print() const {
@@ -105,7 +103,7 @@ Result ExpAST::print() const {
 }
 ```
 
-### RISC-V
+### Riscv
 
 首先，我们需要修改：
 
@@ -132,7 +130,7 @@ typedef struct {
 
 从而知道，`koopa_raw_binary_t` 类型指令的左右操作数分别是 `lhs` 和 `rhs`，操作符是 `op`。
 
-这里，为了方便 debug，我们引入 `include/utils.hpp` 以及对应的 `utils.cpp` 文件，创建辅助函数（具体实现见源文件，就是无聊的 switch case）：
+这里，为了方便 debug，我们引入 `include/other_utils.hpp` 以及对应的 `other_utils.cpp` 文件，创建辅助函数（具体实现见源文件，就是无聊的 `switch` `case`）：
 
 ```cpp
 #pragma once
@@ -152,11 +150,11 @@ std::string koopaRawBinaryOpToString(int op);
 - 如果 `tag` 是 `KOOPA_RVT_INTEGER`，那么他就是立即数。
 - 如果 `tag` 是 `KOOPA_RVT_BINARY`，那么他就是之前某条指令的结果。
 
-所以，为了让我们的 visit 函数能正确处理这里的寄存器，我们需要在处理 `visit(const koopa_raw_binary_t& binary)` 时，递归处理 `lhs` 和 `rhs`，且处理时，我们就需要设法管理寄存器，从而能在前面存、在后面取。
+所以，为了让我们的 `visit` 函数能正确处理这里的寄存器，我们需要在处理 `visit(const koopa_raw_binary_t& binary)` 时，递归处理 `lhs` 和 `rhs`，且处理时，我们就需要设法管理寄存器，从而能在前面存、在后面取。
 
 指令类型通过 `kind.tag` 来区分，指令内容通过 `kind.data` 来访问。
 
-由于我们需要存储一条指令的返回结果（以供未来使用），所以我们还需要修改这个 visit 函数，引入第二个参数 `value`，来表示当前指令：
+由于我们需要存储一条指令的返回结果（以供未来使用），所以我们还需要修改这个 `visit` 函数，引入第二个参数 `value`，来表示当前指令：
 
 ```cpp
 void visit(const koopa_raw_binary_t& binary, const koopa_raw_value_t& value) {
@@ -164,7 +162,7 @@ void visit(const koopa_raw_binary_t& binary, const koopa_raw_value_t& value) {
 }
 ```
 
-同时，我们还要处理 ret 语句的 visit 函数，使之支持返回表达式的值。
+同时，我们还要处理 `ret` 语句的 `visit` 函数，使之支持返回表达式的值。
 
 形如 `ret %1` 的指令，其 `ret.value` 就是之前的指令的指针（就是文档的说法）。
 
@@ -191,17 +189,17 @@ void visit(const koopa_raw_return_t& ret) {
 
 ## Lv3.2
 
-### Koopa IR
+### Koopa
 
 没啥好说的，和 Lv 3.1 思路类似的修改方式。
 
-### RISC-V
+### Riscv
 
 同上。
 
 ## Lv3.3
 
-### Koopa IR
+### Koopa
 
 草，早知道直接把 Lv3.2 和 Lv3.3 写一起了，这改来改去的，烦死了。
 
@@ -252,7 +250,7 @@ Result LExpWithOpAST::print() const {
 }
 ```
 
-### RISC-V
+### Riscv
 
 新增 Koopa 指令：
 
@@ -277,9 +275,9 @@ void visit(const koopa_raw_binary_t& binary, const koopa_raw_value_t& value);
 - 左边选择 `C`
 - 右边选择 `RISC-V rv32gc clang(trunk)`
 
-草，发现 case27 寄存器超过使用限制了，看来得复用寄存器才行，不能每个中间结果都开一个新的。
+发现 `27_complex_binary` 寄存器超过使用限制了，看来得复用寄存器才行，不能每个中间结果都开一个新的。
 
-正好重新设计一下 RISC-V 指令的实现，新建一个 `include/riscv.hpp`，在其中实现一个`Riscv` 类，来专门处理 RISC-V 指令。
+正好重新设计一下 Riscv 指令的实现，新建一个 `include/backend_utils.hpp`，在其中实现一个`Riscv` 类，来专门处理 Riscv 指令。
 
 本节中有两个小的细节。
 
@@ -483,4 +481,4 @@ UnaryExp
 
 ## Debug
 
-lv3 会有一个测试点过不了，但无所谓，lv4 会将寄存器完全改为使用栈来存储，所以不用 care，写完 lv4 自然就过了。
+Lv3 会有一个测试点过不了，但无所谓，Lv4 会将寄存器完全改为使用栈来存储，所以不用 care，写完 Lv4 自然就过了。

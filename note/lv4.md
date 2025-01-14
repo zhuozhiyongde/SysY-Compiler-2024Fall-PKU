@@ -4,15 +4,22 @@
 
 直接看 lv9 的词法，发现 `BType` 可以直接无缝换为 `int`，遂直接替换。
 
-倒查了一下发现前面的很多实现都是冗余的，尤其是很多对于 optional 的使用，基本上都在 flex 中直接剪枝了。
+> 来自做完 Lv8 的回旋镖：不要这么搞，这么搞会导致后续对于函数定义出现移进-规约冲突。
 
-出于可维护性的考量，我们在这里恢复了部分 AST 类，对于有多个产生式的 AST 类，我们使用 withXXX 的命名来区分产生式体的对应 AST 类。
+倒查了一下发现前面的很多实现都是冗余的，尤其是很多对于 `optional` 的使用，基本上都在 `flex` 中直接剪枝了。
 
-对于 optional，只供部分可能未初始化的字段使用，如 `VarDefAST` 的 `value` 字段。
+出于可维护性的考量，我们在这里恢复了部分 AST 类，对于有多个产生式的 AST 类，我们使用 `withXXX` 的命名来区分产生式体的对应 AST 类。
+
+对于 `optional`，只供部分可能未初始化的字段使用，如 `VarDefAST` 的 `value` 字段。
 
 为了能够处理变量的定义，我们引入一个新的符号类 `Symbol` 和符号表类 `SymbolTable`，用于存储变量名、变量类型和其对应的符号：
 
 ```cpp
+/**
+ * @brief 符号类，表示变量或常量
+ * @note - `type`：符号的类型，变量 VAR / 常量 VAL
+ * @note - `value`：符号的值：对于 VAR 和 VAL 类型，value 表示变量或常量的值
+ */
 class Symbol {
 public:
     enum class Type {
@@ -25,20 +32,46 @@ public:
     Symbol(Type type, int value = 0) : type(type), value(value) {}
 };
 
+/**
+ * @brief 一些宏定义，用于快速创建 Symbol 对象
+ */
+
+#define VAR_ Symbol(Symbol::Type::VAR, 0)
+#define VAL_(value) Symbol(Symbol::Type::VAL, value)
+
+ /**
+  * @brief 符号表类，管理变量名和符号，实现为单向链表
+  * @note - `symbol_table`：符号表，存储变量名和符号
+  * @note - `depth`：符号表的深度
+  * @note - `is_returned`：包含符号表是否已经存在 return 语句，用于判断是否需要生成后续语句
+  * @note - `parent`：指向父级符号表的指针
+  */
 class SymbolTable {
 private:
     unordered_map<string, Symbol> symbol_table;
-    bool is_returned = false;
 public:
-    void create(const string& name, Symbol symbol);
-    bool exist(const string& name);
-    Symbol read(const string& name);
-    void set_returned(bool is_returned);
-    bool get_returned();
+    int depth = 0;
+    bool is_returned = false;
+    SymbolTable* parent = nullptr;
+
+    void create(const string& ident, Symbol symbol);
+    bool exist(const string& ident);
+    Symbol read(const string& ident);
+    void set_parent(SymbolTable* parent);
+    string locate(const string& ident);
+    string assign(const string& ident);
 };
 ```
 
-这里额外引入了一个字段 `is_returned`，用于表示当前符号表是否已经返回。这其实是对于测试用例的特殊处理，在测试点 18_multiple_returns2 中，存在多条 return 语句，我们应当只处理到第一个 return 语句后，就停止处理：
+这里额外引入了一个字段 `is_returned`，用于表示当前符号表是否已经返回。这其实是对于测试用例的特殊处理，在测试点 `18_multiple_returns2` 中，存在多条 `return` 语句，形如：
+
+```cpp
+int main(){
+    return 0; return 1;
+}
+```
+
+我们应当只处理到第一个 `return` 语句后，就停止处理（或者提前看后续 Lv6 的实现办法）：
 
 ```cpp
 // ast.cpp 
@@ -59,7 +92,7 @@ Result BlockAST::print() const {
 
 由于我们需要实现常量计算，所以我们要思考，何时能够直接在自底向上的翻译过程中即可给出常量？
 
-**答：一个操作数两端都是立即数的时候，我们可以返回一个立即数，若任一为变量，则需要生成计算指令。若一个表达式完全就是一个立即数，其必然可以构建出一个完全由 Result::Type::IMM 组成二叉树。**
+**答：一个操作数两端都是立即数的时候，我们可以返回一个立即数，若任一为变量，则需要生成计算指令。若一个表达式完全就是一个立即数，其必然可以构建出一个完全由 `Result::Type::IMM` 组成二叉树。**
 
 这就是后续课程的优化一节中会学到的“常量折叠”。
 
@@ -75,7 +108,7 @@ Result BlockAST::print() const {
 #define REG_(value) Result(Result::Type::REG, value)
 ```
 
-这里末尾加了一个 `_` 是类比 PyTorch 的“原地操作” 进行命名的，表示“在这里生成一个对应类”，这同时也是为了区分同名类型常量。
+这里末尾加了一个 `_` 是类比 PyTorch 的“原地操作” 进行命名的，表示“在这里生成一个对应类”，这同时也是为了区分同名类型枚举常量。
 
 ## Riscv
 
@@ -102,7 +135,7 @@ void visit(const koopa_raw_function_t& func) {
 };
 ```
 
-但是，注意到示例代码中，我们实际上是先恢复帧栈再 ret 的，所以我们必须拆开创建帧栈和恢复帧栈到两个地方。
+但是，注意到示例代码中，我们实际上是先恢复帧栈再 `ret` 的，所以我们必须拆开创建帧栈和恢复帧栈到两个地方。
 
 一个合理的想法是把这个帧栈大小置为全局变量，这样就能在过程间共享，但出于可维护性的考量，我们创建一个新的类 `ContextManager` 来管理帧栈，这样即使我们未来需要处理被调用者保存寄存器等问题，也能有比较好的扩展性。
 
@@ -142,7 +175,7 @@ Context& context; // 当前函数对应的 context
 我额外重构了所有涉及寄存器分配的部分：
 
 ```cpp
-// include/helper.hpp
+// include/backend_utils.hpp
 class RegisterManager {
 private:
     // 寄存器计数器
@@ -202,6 +235,8 @@ public:
 
 在修改 `visit.cpp` 时，必须需要辨析当前使用的 map 究竟是寄存器的 `reg_map` 还是帧栈的 `stack_map`，它们都以一条代表指令的 `koopa_raw_value_t` 类型为键。
 
+> 来自写完之后的补充：这里建议去看 Koopa.md 中对于 value 这个东西的说明，不然很容易混淆/搞不懂为什么。
+
 一句话概括就是你得看现在是否在访存，如果在访存，也即 `lw / sw` 指令，那必然需要使用 `stack_map`，如果仅仅是在执行计算，那只需要使用 `reg_map`。
 
 ```cpp
@@ -219,12 +254,12 @@ else if (ret.value->kind.tag == KOOPA_RVT_LOAD) {
 
 ## Debug
 
-发现在实现中忽略了对于立即数偏置的 12 位立即数限制。由于存在交叉引用，遂重构了 `include/helper.hpp`，将实现移动到了 `helper.cpp` 中。
+发现在实现中忽略了对于立即数偏置的 12 位立即数限制。
 
-对于 `_sw`、`_lw` 指令，需要检查偏移量是否在 12 位立即数范围内，否则需要使用寄存器来存储偏移量。
+对于 `_sw`、`_lw` 指令，在其内需要检查偏移量是否在 12 位立即数范围内，若超出则需要使用寄存器来存储偏移量然后计算得到最终地址。
 
 注意这里，偏移量不是指做成 `t1(sp)`，而是先做 `t1 = bias; t1 = sp + t1`，然后再 `lw t0, (t1)`。对 `sw` 指令同理。
 
-新增 `_add_sp` 指令，用于在修改栈指针前预检立即数是否在 12 位立即数范围内，若不在，则使用寄存器来存储偏移量。
-
 又又发现过不去 `21_decl_after_decl3` 测试点，遂检查了一下代码，发现是不能仅仅只在 `load` 、 `store` 指令中重置寄存器计数，对于 `binary` 指令，也需要重置寄存器计数。
+
+> 来自写完之后的补充：后来就是在每次 `void visit(const koopa_raw_value_t& value)` 时，都会先重置寄存器计数了。

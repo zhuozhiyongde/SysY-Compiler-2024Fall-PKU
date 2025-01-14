@@ -6,7 +6,7 @@
 
 各级符号表显然随着 Block 块的嵌套而嵌套，这自然而然地形成了一个链表的结构。
 
-根据这个思路，我们首先修改 `include/type.hpp`，增加两个成员变量 `parent` 和 `depth`，分别用于表示指向父符号表的指针和当前符号表的深度，后者用于在 Koopa 中间代码中，区分不同层级的同名变量，并添加相应的成员函数。
+根据这个思路，我们首先修改 `include/frontend_utils.hpp`，增加两个成员变量 `parent` 和 `depth`，分别用于表示指向父符号表的指针和当前符号表的深度，后者用于在 Koopa 中间代码中，区分不同层级的同名变量，并添加相应的成员函数。
 
 ```cpp
 // include/type.hpp
@@ -31,12 +31,11 @@ public:
 };
 ```
 
-然后，我们修改 `type.cpp`，实现这些成员函数：
+然后，我们修改 `frontend_utils.cpp`，实现这些成员函数：
 
 ```cpp
-// type.cpp
-#include "include/type.hpp"
-
+// frontend_utils.cpp
+#include "include/frontend_utils.hpp"
 void SymbolTable::create(const string& ident, Symbol symbol) {
     // 保证当前层级不存在
     assert(symbol_table.find(ident) == symbol_table.end());

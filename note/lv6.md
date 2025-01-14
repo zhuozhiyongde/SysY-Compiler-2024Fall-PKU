@@ -37,18 +37,21 @@ $$
 我们实现一下：
 
 ```bison
-<!-- sysy.y -->
 Stmt
   : MatchedStmt {
+    // if-else 完全匹配的语句，保证 else 永远匹配到最近的 if
     $$ = $1;
   }
   | OpenStmt {
+    // if-else 不匹配的语句
     $$ = $1;
   }
   ;
 
 MatchedStmt
   : IF '(' Exp ')' MatchedStmt ELSE MatchedStmt {
+    // if-else 语句，保证 else 永远匹配到最近的 if
+    // 注意，这可能会嵌套定义。
     auto ast = new StmtIfAST();
     ast->exp = unique_ptr<BaseAST>($3);
     ast->then_stmt = unique_ptr<BaseAST>($5);
@@ -56,31 +59,35 @@ MatchedStmt
     $$ = ast;
   }
   | LVal '=' Exp ';' {
+    // 赋值语句，如 a = 1;
     auto ast = new StmtAssignAST();
     ast->l_val = unique_ptr<BaseAST>($1);
     ast->exp = unique_ptr<BaseAST>($3);
     $$ = ast;
   }
   | Exp ';'{
+    // 表达式语句，如 a + 1;
     auto ast = new StmtExpAST();
     ast->exp = unique_ptr<BaseAST>($1);
     $$ = ast;
   }
   | ';'{
+    // 空语句，如 ;
     auto ast = new StmtExpAST();
     $$ = ast;
   }
   | Block {
-    auto ast = new StmtBlockAST();
-    ast->block = unique_ptr<BaseAST>($1);
-    $$ = ast;
+    // 块语句，如 { int a = 1; }
+    $$ = $1;
   }
   | RETURN Exp ';' {
+    // 带返回值的 return 语句，如 return 1;
     auto ast = new StmtReturnAST();
     ast->exp = unique_ptr<BaseAST>($2);
     $$ = ast;
   }
   | RETURN ';' {
+    // 不带返回值的 return 语句，如 return;
     auto ast = new StmtReturnAST();
     $$ = ast;
   }
@@ -94,6 +101,7 @@ OpenStmt
     $$ = ast;
   }
   | IF '(' Exp ')' MatchedStmt ELSE OpenStmt {
+    // 保证 else 永远匹配到最近的 if
     auto ast = new StmtIfAST();
     ast->exp = unique_ptr<BaseAST>($3);
     ast->then_stmt = unique_ptr<BaseAST>($5);
@@ -127,40 +135,52 @@ public:
 	jump %end_0
 ```
 
-所以，我们得到一个弱智但有效的做法：给所有 `ret` 语句后都添加一个新的标签，然后一通加 `jump` 指令，对于 `StmtIfAST`，做如下处理：
+所以，我们得到一个弱智但有效的做法：给所有 `ret` 语句后都添加一个新的标签，保证每个 `print` 函数的末尾不是一条 `br` / `jump` / `ret`，就可以了。
+
+然后再在 `if` 语句处理里就可以随便加 `jump` 指令了，对于 `StmtIfAST`，做如下处理：
 
 ```cpp
-// ast.cpp
+/**
+ * @brief 打印 if 语句
+ * */
 Result StmtIfAST::print() const {
-  Result exp_result = exp->print();
-  SymbolTable* parent_symbol_table = local_symbol_table;
-
-  string then_label = frontend_context_manager.get_then_label();
-  string else_label = frontend_context_manager.get_else_label();
-  string end_label = frontend_context_manager.get_end_label();
-  frontend_context_manager.add_if_else_count();
-
-  if (else_stmt) {
-    koopa_ofs << "\tbr " << exp_result << ", " << then_label << ", " << else_label << endl;
-    koopa_ofs << then_label << ":" << endl;
-    then_stmt->print();
-    koopa_ofs << "\tjump " << end_label << endl;
-    koopa_ofs << else_label << ":" << endl;
-    (*else_stmt)->print();
-    koopa_ofs << "\tjump " << end_label << endl;
-  }
-  else {
-    koopa_ofs << "\tbr " << exp_result << ", " << then_label << ", " << end_label << endl;
-    koopa_ofs << then_label << ":" << endl;
-    then_stmt->print();
-    koopa_ofs << "\tjump " << end_label << endl;
-  }
-  koopa_ofs << end_label << ":" << endl;
-  return Result();
+    // 先打印条件表达式，并存储计算得出的条件表达式结果
+    Result exp_result = exp->print();
+    // 准备标签
+    string then_label = environment_manager.get_then_label();
+    string else_label = environment_manager.get_else_label();
+    string end_label = environment_manager.get_end_label();
+    environment_manager.add_if_else_count();
+    // 根据是否存在 else 语句进行分支处理
+    if (else_stmt) {
+        // 生成 br 指令
+        koopa_ofs << "\tbr " << exp_result << ", " << then_label << ", " << else_label << endl;
+        // 生成 then 语句块
+        koopa_ofs << then_label << ":" << endl;
+        then_stmt->print();
+        koopa_ofs << "\tjump " << end_label << endl;
+        // 生成 else 语句块
+        koopa_ofs << else_label << ":" << endl;
+        (*else_stmt)->print();
+        koopa_ofs << "\tjump " << end_label << endl;
+    }
+    else {
+        // 生成 br 指令
+        koopa_ofs << "\tbr " << exp_result << ", " << then_label << ", " << end_label << endl;
+        // 生成 then 语句块
+        koopa_ofs << then_label << ":" << endl;
+        then_stmt->print();
+        koopa_ofs << "\tjump " << end_label << endl;
+    }
+    // 生成 end 标签
+    koopa_ofs << end_label << ":" << endl;
+    // 恢复是否返回的记录，避免 if 生成的语句块中有单条 return 语句修改当前块 is_returned = true
+    local_symbol_table->is_returned = false;
+    return Result();
 }
 ```
 
-可以看到，我们会大量的生成 `label`，并添加对应的 `jump` 指令，虽然这很冗余，但恰好能完全满足 `%label` 标号块最末必须是 `br`、`jump` 或 `ret` 的要求。
+可以看到，我们会大量的生成 `label`，并添加对应的 `jump` 指令，虽然这带来了很多冗余指令，但恰好能完全满足 `%label` 标号块最末必须是 `br`、`jump` 或 `ret` 的要求。而且在编译 Riscv 之前，生成内存形式的 Koopa IR 时，这些生成的死代码都会被库函数自动消除掉，不需要我们关心。
 
 ### 处理作用域
 
@@ -168,123 +188,11 @@ Result StmtIfAST::print() const {
 
 如果不给 `MatchedStmt` 新开符号表，那么会导致 `return 2` 影响掉当前符号表的 `is_returned`，从而导致 `return 3` 被跳过。
 
-这里比较烦人的是，我们对于 `BlockAST` 会新建 SymbolTable，但是对于其他语句不会，而 `MatchedStmt` 既可以推导为一个语句，也可以推导为一个 `Block`。
+所以，我们还需要在 `if` 语句处理后，设置当前符号表是否返回为 `false`。
 
-我们必须为单语句的情况也创建一个符号表，用于处理符号重名、是否 return 的判断等。
+注意，`MatchedStmt` 是不会在不推导出 `Block` 下就推导出一条 `Decl` 的，所以你不必再在这里专门创建一个新的符号表。
 
-有两种做法：
-
-1. 在 `StmtIfAST` 中，创建一个临时的 `SymbolTable`，用于避免 `if` 语句中 `return` 影响上层符号表。
-  ```cpp
-  // ast.cpp
-  Result StmtIfAST::print() const {
-    Result exp_result = exp->print();
-    SymbolTable* parent_symbol_table = local_symbol_table;
-    local_symbol_table = new SymbolTable();
-    local_symbol_table->set_parent(parent_symbol_table);
-
-    string then_label = frontend_context_manager.get_then_label();
-    string else_label = frontend_context_manager.get_else_label();
-    string end_label = frontend_context_manager.get_end_label();
-    frontend_context_manager.add_if_else_count();
-
-    if (else_stmt) {
-      koopa_ofs << "\tbr " << exp_result << ", " << then_label << ", " << else_label << endl;
-      koopa_ofs << then_label << ":" << endl;
-      then_stmt->print();
-      koopa_ofs << "\tjump " << end_label << endl;
-      koopa_ofs << else_label << ":" << endl;
-      (*else_stmt)->print();
-      koopa_ofs << "\tjump " << end_label << endl;
-    }
-    else {
-      koopa_ofs << "\tbr " << exp_result << ", " << then_label << ", " << end_label << endl;
-      koopa_ofs << then_label << ":" << endl;
-      then_stmt->print();
-      koopa_ofs << "\tjump " << end_label << endl;
-    }
-    koopa_ofs << end_label << ":" << endl;
-    delete local_symbol_table;
-    local_symbol_table = parent_symbol_table;
-    return Result();
-  }
-  ```
-2. 在 `sysy.y` 中，直接对于 `MatchedStmt` 创建一个 `BlockAST`，然后：
-  1. 对于非 `Block` 的推导，在其 `block_items` 中添加单一的语句。
-  2. 对于 `Block` 的推导，直接返回，也即：
-
-    ```bison
-    MatchedStmt
-      : IF '(' Exp ')' MatchedStmt ELSE MatchedStmt {
-        auto ast = new BlockAST();
-        auto block_item = new StmtIfAST();
-        block_item->exp = unique_ptr<BaseAST>($3);
-        block_item->then_stmt = unique_ptr<BaseAST>($5);
-        block_item->else_stmt = unique_ptr<BaseAST>($7);
-        ast->block_items.push_back(unique_ptr<BaseAST>(block_item));
-        $$ = ast;
-      }
-      | LVal '=' Exp ';' {
-        auto ast = new BlockAST();
-        auto block_item = new StmtAssignAST();
-        block_item->l_val = unique_ptr<BaseAST>($1);
-        block_item->exp = unique_ptr<BaseAST>($3);
-        ast->block_items.push_back(unique_ptr<BaseAST>(block_item));
-        $$ = ast;
-      }
-      | Exp ';'{
-        auto ast = new BlockAST();
-        auto block_item = new StmtExpAST();
-        block_item->exp = unique_ptr<BaseAST>($1);
-        ast->block_items.push_back(unique_ptr<BaseAST>(block_item));
-        $$ = ast;
-      }
-      | ';'{
-        auto ast = new BlockAST();
-        auto block_item = new StmtExpAST();
-        ast->block_items.push_back(unique_ptr<BaseAST>(block_item));
-        $$ = ast;
-      }
-      | Block {
-        $$ = $1;
-      }
-      | RETURN Exp ';' {
-        auto ast = new BlockAST();
-        auto block_item = new StmtReturnAST();
-        block_item->exp = unique_ptr<BaseAST>($2);
-        ast->block_items.push_back(unique_ptr<BaseAST>(block_item));
-        $$ = ast;
-      }
-      | RETURN ';' {
-        auto ast = new BlockAST();
-        auto block_item = new StmtReturnAST();
-        ast->block_items.push_back(unique_ptr<BaseAST>(block_item));
-        $$ = ast;
-      }
-      ;
-
-    OpenStmt
-      : IF '(' Exp ')' Stmt {
-        auto ast = new BlockAST();
-        auto block_item = new StmtIfAST();
-        block_item->exp = unique_ptr<BaseAST>($3);
-        block_item->then_stmt = unique_ptr<BaseAST>($5);
-        ast->block_items.push_back(unique_ptr<BaseAST>(block_item));
-        $$ = ast;
-      }
-      | IF '(' Exp ')' MatchedStmt ELSE OpenStmt {
-        auto ast = new BlockAST();
-        auto block_item = new StmtIfAST();
-        block_item->exp = unique_ptr<BaseAST>($3);
-        block_item->then_stmt = unique_ptr<BaseAST>($5);
-        block_item->else_stmt = unique_ptr<BaseAST>($7);
-        ast->block_items.push_back(unique_ptr<BaseAST>(block_item));
-        $$ = ast;
-      }
-      ;
-    ```
-
-经过测试，两种方法都可行，但第二种方法会导致 `is_returned` 的判断完全失效，因为 `MatchedStmt` 在所有具体的语句的推导关键路径上，所以任何一条语句都会被包在一个 `BlockAST` 中。
+当然，你也可以对他进行一步优化，如果这里是 `if ... else ...`，且两个分支都 `return` 了，那么就直接设置当前符号表的 `is_returned = true`。
 
 不过，有了对于 `ret` 的标号后处理，我们其实完全不用 care 这件事。这个只影响 `BlockAST` 是否多打印一些语句罢了。
 
@@ -292,7 +200,7 @@ Result StmtIfAST::print() const {
 
 ### 跨 Block 链符号重名
 
-现在对于符号的命名基于 symbol_table 的嵌套深度 `depth`，这会导致跨 Block 链的符号重名时，发生多个同名 `alloc` 指令，这是不合法的。
+现在对于符号的命名基于 `symbol_table` 的嵌套深度 `depth`，这会导致跨 Block 链的符号重名时，发生多个同名 `alloc` 指令，这是不合法的。
 
 想要解决这个问题，很简单，只需要维护一个全局的 `is_symbol_allocated` 即可，然后再 `store` 时，检查是否已经分配过，若已经分配过，则不分配，仅重新赋值。
 
@@ -334,7 +242,7 @@ void visit(const koopa_raw_jump_t& jump) {
 
 ## Debug
 
-这里发现时钟过不去 `11_logical1` 测试点，先 `AE` 后 `WA`。
+这里发现始终过不去 `11_logical1` 测试点，先 `AE` 后 `WA`。
 
 首先是 `AE`，发现是我在处理 12 位立即数偏置的时候，错误地使用了 `reg(sp)` 的形式。
 

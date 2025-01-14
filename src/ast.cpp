@@ -532,8 +532,6 @@ Result InitValAST::print() const {
 Result StmtIfAST::print() const {
     // 先打印条件表达式，并存储计算得出的条件表达式结果
     Result exp_result = exp->print();
-    // 备份是否返回的记录，避免 if 语句中的单句 return 修改当前块 is_returned
-    bool backup_is_returned = local_symbol_table->is_returned;
     // 准备标签
     string then_label = environment_manager.get_then_label();
     string else_label = environment_manager.get_else_label();
@@ -562,8 +560,8 @@ Result StmtIfAST::print() const {
     }
     // 生成 end 标签
     koopa_ofs << end_label << ":" << endl;
-    // 恢复是否返回的记录
-    local_symbol_table->is_returned = backup_is_returned;
+    // 恢复是否返回的记录，避免 if 生成的语句块中有单条 return 语句修改当前块 is_returned = true
+    local_symbol_table->is_returned = false;
     return Result();
 }
 
@@ -614,7 +612,7 @@ Result StmtWhileAST::print() const {
 Result StmtBreakAST::print() const {
     // 生成跳转指令，跳转到当前 while 循环（即 current 计数器）的结束标签
     koopa_ofs << "\tjump " << environment_manager.get_while_end_label(true) << endl;
-    // 生成跳转标签
+    // 生成跳转后标签，避免 jump 指令成为最后一条语句
     auto jump_label = environment_manager.get_jump_label();
     koopa_ofs << jump_label << ":" << endl;
     return Result();
@@ -626,7 +624,7 @@ Result StmtBreakAST::print() const {
 Result StmtContinueAST::print() const {
     // 生成跳转指令，跳转到当前 while 循环（即 current 计数器）的入口标签
     koopa_ofs << "\tjump " << environment_manager.get_while_entry_label(true) << endl;
-    // 生成跳转标签
+    // 生成跳转后标签，避免 jump 指令成为最后一条语句
     auto jump_label = environment_manager.get_jump_label();
     koopa_ofs << jump_label << ":" << endl;
     return Result();
