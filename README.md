@@ -1,47 +1,257 @@
-# 基于 Makefile 的 SysY 编译器项目模板
+# SysY-Compiler-2024Fall-PKU
 
-该仓库中存放了一个基于 Makefile 的 SysY 编译器项目的模板, 你可以在该模板的基础上进行进一步的开发.
+此为 `work` 分支，包含完整的开发记录。
 
-该仓库中的 C/C++ 代码实现仅作为演示, 不代表你的编译器必须以此方式实现. 如你需要使用该模板, 建议你删掉所有 C/C++ 源文件, 仅保留 `Makefile` 和必要的目录结构, 然后重新开始实现.
+## 文件夹结构
 
-该模板仅供不熟悉 Makefile 的同学参考, 在理解基本原理的基础上, 你完全可以不使用模板完成编译器的实现. 如你决定不使用该模板并自行编写 Makefile, 请参考 [“评测平台要求”](#评测平台要求) 部分.
-
-## 使用方法
-
-首先 clone 本仓库:
-
-```sh
-git clone https://github.com/pku-minic/sysy-make-template.git
+```
+.
+├── note
+├── src
+├── docker-compose.yml
+├── get
+├── hello.asm
+├── hello.c
+├── hello.s
+├── Makefile
+├── README.md
+└── test.sh
 ```
 
-在 [compiler-dev](https://github.com/pku-minic/compiler-dev) 环境内, 进入仓库目录后执行 `make` 即可编译得到可执行文件 (默认位于 `build/compiler`):
+其中：
 
-```sh
-cd sysy-make-template
-make
+- `note`：详细的各阶段开发笔记，在整体完成后有回顾检查，可能和 `main` 分支的对应阶段源码有出入。
+- `src`：源代码
+- `get`：一个获取本地测试点源码的工具，语法为 `./get [lv] [id]`，其中 `id` 可能要前补 0，或者你也可以直接在容器内运行 `cp -r /opt/bin/testcases/ .`
+- `hello.[c/asm/s]`：测试编译使用的的源代码 / Koopa IR / RISC-V 结果，在容器外创建可以编辑
+- `test.sh`：本地测试所需指令记录，可根据需求自行注释 / 取消注释其中部分行。
+
+源代码目录进一步展开：
+
+```
+src
+├── asm.cpp
+├── ast.cpp
+├── backend_utils.cpp
+├── frontend_utils.cpp
+├── include
+│   ├── asm.hpp
+│   ├── ast.hpp
+│   ├── backend_utils.hpp
+│   ├── frontend_utils.hpp
+│   ├── koopa.h
+│   └── other_utils.hpp
+├── main.cpp
+├── other_utils.cpp
+├── sysy.l
+└── sysy.y
 ```
 
-如在此基础上进行开发, 你需要重新初始化 Git 仓库:
+其中：
 
-```sh
-rm -rf .git
-git init
+- `main.cpp`：主程序，包含编译器的入口函数
+- `sysy.l` 和 `sysy.y`：词法（Flex） / 语法（Bison）分析的源文件，解析源代码为抽象语法树 AST
+- `ast.cpp`：前端部分，负责在语法分析的结果基础上进行语义分析，将解析得到的 AST 输出 Koopa IR
+- `frontend_utils.cpp`：前端辅助部分，包括一些数据结构定义、全局变量等
+- `asm.cpp`：后端部分，负责将 Koopa IR 转换为 RISC-V 汇编
+- `backend_utils.cpp`：后端辅助部分，包括一些数据结构定义、全局变量等
+- `other_utils.cpp`：一些其他辅助函数，主要是用于调试 `koopa.h` 库
+
+## 本地测试
+
+### Docker
+
+启动容器：
+
+```bash
+docker compose up -d
 ```
 
-然后, 根据情况修改 `Makefile` 中的 `CPP_MODE` 参数. 如果你决定使用 C 语言进行开发, 你应该将其值改为 `0`.
+想要进入容器 CLI，可以输入：
 
-最后, 将自己的编译器的源文件放入 `src` 目录.
-
-## 测试要求
-
-当你提交一个根目录包含 `Makefile` 文件的仓库时, 测试脚本/评测平台会使用如下命令编译你的编译器:
-
-```sh
-make DEBUG=0 BUILD_DIR="build目录" LIB_DIR="libkoopa目录" INC_DIR="libkoopa头文件目录" -C "repo目录"
+```bash
+docker exec -it compiler bash -c "cd compiler; bash"
 ```
 
-你的 `Makefile` 必须依据 `BUILD_DIR` 参数的值, 将生成的可执行文件输出到该路径中, 并命名为 `compiler`.
+出于便利性考虑，亦可以直接将之追加到 `~/.zshrc` 或者 `~/.bashrc`：
 
-如需链接 `libkoopa`, 你的 `Makefile` 应当处理 `LIB_DIR` 和 `INC_DIR`.
+```bash
+alias qwe='docker exec -it compiler bash -c "cd compiler; bash"'
+```
 
-模板中的 `Makefile` 已经处理了上述内容, 你无需额外关心.
+### 测试前端（Koopa IR 中间代码生成）
+
+```bash
+# 将 hello.c 编译为 Koopa IR
+make >>  && build/compiler -koopa hello.c -o hello.asm
+
+# 本地运行对于 Koopa 的测试
+autotest -koopa -s lv9 /root/compiler
+
+# 测试 Koopa 输出结果
+make && build/compiler -koopa hello.c -o hello.asm
+echo "==========="
+koopac hello.asm | llc --filetype=obj -o hello.o
+clang hello.o -L$CDE_LIBRARY_PATH/native -lsysy -o hello
+echo "==========="
+./hello
+rm hello.o hello
+```
+
+你可以适当的在源代码中添加 `putint`、`putch` 来调试，如：
+
+```cpp
+int main(){
+	int a = 1;
+  putint(a); // 在终端输出 a 的值
+  putch(10); // 在终端初始 ASCII = 10，也即换行符
+  return;
+}
+```
+
+ 也可以在 Koopa IR 中输出，打印某个 SSA 的结果，如原始代码为：
+
+```cpp
+int main() {
+  int a = 1;
+  int b = 2;
+  int c = a + b;
+  return c;
+}
+```
+
+编译结果为：
+
+```asm
+decl @getint(): i32
+decl @getch(): i32
+decl @getarray(*i32): i32
+decl @putint(i32)
+decl @putch(i32)
+decl @putarray(i32, *i32)
+decl @starttime()
+decl @stoptime()
+
+
+fun @main(): i32 {
+%main_entry:
+	@a_2 = alloc i32
+	store 1, @a_2
+	@b_2 = alloc i32
+	store 2, @b_2
+	@c_2 = alloc i32
+	%0 = load @a_2
+	%1 = load @b_2
+	%2 = add %0, %1
+	store %2, @c_2
+	%3 = load @c_2
+	ret %3
+%jump_0:
+	ret 0
+}
+
+```
+
+如果你想看中间结果 `%2`，只需要额外添加几行：
+
+```asm
+decl @getint(): i32
+decl @getch(): i32
+decl @getarray(*i32): i32
+decl @putint(i32)
+decl @putch(i32)
+decl @putarray(i32, *i32)
+decl @starttime()
+decl @stoptime()
+
+
+fun @main(): i32 {
+%main_entry:
+	@a_2 = alloc i32
+	store 1, @a_2
+	@b_2 = alloc i32
+	store 2, @b_2
+	@c_2 = alloc i32
+	%0 = load @a_2
+	%1 = load @b_2
+	%2 = add %0, %1
+	// ---
+	// 添加下面这两行
+	call @putint(%3)
+	call @putch(10)
+	// ---
+	store %2, @c_2
+	%3 = load @c_2
+	ret %3
+%jump_0:
+	ret 0
+}
+
+```
+
+### 测试后端（RISC-V 目标代码生成）
+
+```bash
+# 将 hello.c 编译为 Riscv 汇编
+make && build/compiler -riscv hello.c -o hello.s
+
+# 本地运行对于 Riscv 的测试
+autotest -riscv -s lv9 /root/compiler
+
+# 测试 Riscv
+make && build/compiler -riscv hello.c -o hello.s
+echo "==========="
+clang hello.s -c -o hello.o -target riscv32-unknown-linux-elf -march=rv32im -mabi=ilp32
+ld.lld hello.o -L$CDE_LIBRARY_PATH/riscv32 -lsysy -o hello
+echo "==========="
+qemu-riscv32-static hello
+rm hello.o hello
+```
+
+## 最终语法
+
+```ebnf
+CompUnit      ::= [CompUnit] (Decl | FuncDef);
+
+Decl          ::= ConstDecl | VarDecl;
+ConstDecl     ::= "const" BType ConstDef {"," ConstDef} ";";
+BType         ::= "int";
+ConstDef      ::= IDENT {"[" ConstExp "]"} "=" ConstInitVal;
+ConstInitVal  ::= ConstExp | "{" [ConstInitVal {"," ConstInitVal}] "}";
+VarDecl       ::= BType VarDef {"," VarDef} ";";
+VarDef        ::= IDENT {"[" ConstExp "]"}
+                | IDENT {"[" ConstExp "]"} "=" InitVal;
+InitVal       ::= Exp | "{" [InitVal {"," InitVal}] "}";
+
+FuncDef       ::= FuncType IDENT "(" [FuncFParams] ")" Block;
+FuncType      ::= "void" | "int";
+FuncFParams   ::= FuncFParam {"," FuncFParam};
+FuncFParam    ::= BType IDENT ["[" "]" {"[" ConstExp "]"}];
+
+Block         ::= "{" {BlockItem} "}";
+BlockItem     ::= Decl | Stmt;
+Stmt          ::= LVal "=" Exp ";"
+                | [Exp] ";"
+                | Block
+                | "if" "(" Exp ")" Stmt ["else" Stmt]
+                | "while" "(" Exp ")" Stmt
+                | "break" ";"
+                | "continue" ";"
+                | "return" [Exp] ";";
+
+Exp           ::= LOrExp;
+LVal          ::= IDENT {"[" Exp "]"};
+PrimaryExp    ::= "(" Exp ")" | LVal | Number;
+Number        ::= INT_CONST;
+UnaryExp      ::= PrimaryExp | IDENT "(" [FuncRParams] ")" | UnaryOp UnaryExp;
+UnaryOp       ::= "+" | "-" | "!";
+FuncRParams   ::= Exp {"," Exp};
+MulExp        ::= UnaryExp | MulExp ("*" | "/" | "%") UnaryExp;
+AddExp        ::= MulExp | AddExp ("+" | "-") MulExp;
+RelExp        ::= AddExp | RelExp ("<" | ">" | "<=" | ">=") AddExp;
+EqExp         ::= RelExp | EqExp ("==" | "!=") RelExp;
+LAndExp       ::= EqExp | LAndExp "&&" EqExp;
+LOrExp        ::= LAndExp | LOrExp "||" LAndExp;
+ConstExp      ::= Exp;
+```
+

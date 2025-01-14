@@ -1,117 +1,41 @@
 
 	.text
-	.globl f1
-f1:
-	addi sp, sp, -96
-f1_entry:
+	.globl f2d
+f2d:
+	addi sp, sp, -32
+f2d_entry:
 	sw a0, 0(sp)
-	sw a1, 4(sp)
 	lw t0, 0(sp)
 	sw t0, 8(sp)
 	lw t0, 8(sp)
+	li t1, 3
+	li t3, 2
+	sll t1, t1, t3
+	add t0, t0, t1
 	sw t0, 12(sp)
-	li t0, 1
-	lw t1, 12(sp)
-	sw t0, 0(t1)
-	lw t0, 0(sp)
+	lw t0, 12(sp)
+	lw t0, 0(t0)
 	sw t0, 16(sp)
 	lw t0, 16(sp)
-	sw t0, 20(sp)
-	lw t0, 20(sp)
-	lw t0, 0(t0)
-	sw t0, 24(sp)
-	lw t0, 24(sp)
-	li t1, 1
-	add t0, t0, t1
-	sw t0, 28(sp)
-	lw t0, 4(sp)
-	sw t0, 32(sp)
-	lw t0, 32(sp)
-	sw t0, 36(sp)
-	lw t0, 36(sp)
-	li t1, 1
-	li t3, 4
-	mul t1, t1, t3
-	add t0, t0, t1
-	sw t0, 40(sp)
-	lw t0, 28(sp)
-	lw t1, 40(sp)
-	sw t0, 0(t1)
-	lw t0, 4(sp)
-	sw t0, 44(sp)
-	lw t0, 44(sp)
-	sw t0, 48(sp)
-	lw t0, 48(sp)
-	li t1, 1
-	li t3, 4
-	mul t1, t1, t3
-	add t0, t0, t1
-	sw t0, 52(sp)
-	lw t0, 52(sp)
-	lw t0, 0(t0)
-	sw t0, 56(sp)
-	lw t0, 56(sp)
-	li t1, 1
-	add t0, t0, t1
-	sw t0, 60(sp)
-	lw t0, 4(sp)
-	sw t0, 64(sp)
-	lw t0, 64(sp)
-	li t1, 1
-	li t3, 8
-	mul t1, t1, t3
-	add t0, t0, t1
-	sw t0, 68(sp)
-	lw t0, 68(sp)
-	sw t0, 72(sp)
-	lw t0, 60(sp)
-	lw t1, 72(sp)
-	sw t0, 0(t1)
-	li a0, 0
-	addi sp, sp, 96
+	sw t0, 4(sp)
+	addi sp, sp, 32
 	ret
 
 	.text
 	.globl main
 main:
-	addi sp, sp, -80
-	sw ra, 76(sp)
+	addi sp, sp, -16
+	sw ra, 12(sp)
 main_entry:
-	addi t0, sp, 0
-	sw t0, 36(sp)
-	addi t0, sp, 12
-	sw t0, 40(sp)
-	lw a0, 36(sp)
-	lw a1, 40(sp)
-	call f1
-	sw a0, 44(sp)
-	addi t0, sp, 0
-	sw t0, 48(sp)
-	lw t0, 48(sp)
-	lw t0, 0(t0)
-	sw t0, 52(sp)
-	lw t0, 52(sp)
-	mv a0, t0
-	call putint
-	li a0, 10
-	call putch
-	addi t0, sp, 12
-	sw t0, 56(sp)
-	lw t0, 56(sp)
-	li t1, 1
-	li t3, 4
-	mul t1, t1, t3
-	add t0, t0, t1
-	sw t0, 60(sp)
-	lw t0, 60(sp)
-	lw t0, 0(t0)
-	sw t0, 64(sp)
-	lw t0, 64(sp)
-	mv a0, t0
+	li t0, 2
+	sw t0, 0(sp)
+	lw t0, 0(sp)
+	sw t0, 4(sp)
+	lw a0, 4(sp)
 	call putint
 	li a0, 10
 	call putch
 	li a0, 0
-	lw ra, 76(sp)
-	addi sp, sp, 80
+	lw ra, 12(sp)
+	addi sp, sp, 16
 	ret
