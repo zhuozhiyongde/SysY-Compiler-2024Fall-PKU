@@ -83,7 +83,7 @@ alias qwe='docker exec -it compiler bash -c "cd compiler; bash"'
 
 ```bash
 # 将 hello.c 编译为 Koopa IR
-make >>  && build/compiler -koopa hello.c -o hello.asm
+make && build/compiler -koopa hello.c -o hello.asm
 
 # 本地运行对于 Koopa 的测试
 autotest -koopa -s lv9 /root/compiler
