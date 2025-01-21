@@ -208,6 +208,11 @@ qemu-riscv32-static hello
 rm hello.o hello
 ```
 
+## 最终测评结果
+
+- 本地测试 / 远程测试：全部 AC
+- 性能测试：609ms
+
 ## 最终语法
 
 ```ebnf
@@ -254,4 +259,3 @@ LAndExp       ::= EqExp | LAndExp "&&" EqExp;
 LOrExp        ::= LAndExp | LOrExp "||" LAndExp;
 ConstExp      ::= Exp;
 ```
-
